@@ -93,7 +93,7 @@ class _ConsultationPaymentPageState extends State<ConsultationPaymentPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'CHECKOUT',
+          'BOOKING PAYMENT',
           style: GoogleFonts.epilogue(
             color: textColor,
             fontWeight: FontWeight.w700,

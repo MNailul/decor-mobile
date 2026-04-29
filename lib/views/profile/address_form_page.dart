@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/address_provider.dart';
 import '../../models/address_model.dart';
 import '../../core/theme/app_colors.dart';
+import '../../widgets/bounce_tap.dart';
 
 class AddressFormPage extends StatefulWidget {
   final AddressModel? addressToEdit;
@@ -70,20 +71,20 @@ class _AddressFormPageState extends State<AddressFormPage> {
     final isEditing = widget.addressToEdit != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAF9F6),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.black87, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          isEditing ? 'EDIT ADDRESS' : 'ADD ADDRESS',
+          isEditing ? 'EDIT ADDRESS' : 'ADD NEW ADDRESS',
           style: GoogleFonts.epilogue(
-            color: Colors.black87,
+            color: Colors.black,
             fontWeight: FontWeight.w700,
             fontSize: 16,
             letterSpacing: 1.5,
@@ -91,93 +92,127 @@ class _AddressFormPageState extends State<AddressFormPage> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              _buildSectionHeader('LABEL'),
               _buildTextField(
                 controller: _nameController,
-                label: 'Address Label (e.g. Home, Office)',
+                hint: 'e.g. Home, Office, Apartment',
                 validator: (value) => value!.isEmpty ? 'Please enter a label' : null,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
+              _buildSectionHeader('RECIPIENT INFO'),
               _buildTextField(
                 controller: _recipientNameController,
-                label: 'Recipient Name',
+                hint: 'Full Name',
                 validator: (value) => value!.isEmpty ? 'Please enter recipient name' : null,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               _buildTextField(
                 controller: _phoneNumberController,
-                label: 'Phone Number',
+                hint: 'Phone Number',
                 keyboardType: TextInputType.phone,
                 validator: (value) => value!.isEmpty ? 'Please enter phone number' : null,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
+              _buildSectionHeader('LOCATION DETAILS'),
               _buildTextField(
                 controller: _fullAddressController,
-                label: 'Full Address',
+                hint: 'Street Name, House No, City, etc.',
                 maxLines: 4,
                 validator: (value) => value!.isEmpty ? 'Please enter full address' : null,
               ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _isMain,
-                    activeColor: AppColors.primaryColor,
-                    onChanged: (value) {
-                      setState(() {
-                        _isMain = value ?? false;
-                      });
-                    },
-                  ),
-                  Text(
-                    'Set as Main Address',
-                    style: GoogleFonts.epilogue(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+              const SizedBox(height: 40),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F8F8),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFF0F0F0)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SET AS MAIN',
+                          style: GoogleFonts.epilogue(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11,
+                            letterSpacing: 1,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Make this your default address',
+                          style: GoogleFonts.epilogue(
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    Switch.adaptive(
+                      value: _isMain,
+                      activeColor: AppColors.primaryColor,
+                      onChanged: (value) {
+                        setState(() {
+                          _isMain = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
       bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
         decoration: BoxDecoration(
-          color: const Color(0xFFFAF9F6),
+          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withOpacity(0.05),
               offset: const Offset(0, -4),
-              blurRadius: 10,
+              blurRadius: 20,
             ),
           ],
         ),
         child: SafeArea(
-          child: ElevatedButton(
-            onPressed: _saveAddress,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          child: BounceTap(
+            onTap: _saveAddress,
+            child: Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryColor.withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
               ),
-            ),
-            child: Text(
-              'SAVE ADDRESS',
-              style: GoogleFonts.epilogue(
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: 13,
+              child: Center(
+                child: Text(
+                  'SAVE ADDRESS',
+                  style: GoogleFonts.epilogue(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
           ),
@@ -186,51 +221,53 @@ class _AddressFormPageState extends State<AddressFormPage> {
     );
   }
 
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0, left: 4),
+      child: Text(
+        title,
+        style: GoogleFonts.epilogue(
+          color: Colors.black45,
+          fontWeight: FontWeight.w800,
+          fontSize: 10,
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
-    required String label,
+    required String hint,
     int maxLines = 1,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.epilogue(
-            color: Colors.black54,
-            fontWeight: FontWeight.w600,
-            fontSize: 12,
-            letterSpacing: 0.5,
-          ),
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: keyboardType,
+      validator: validator,
+      style: GoogleFonts.epilogue(fontSize: 15, color: Colors.black, fontWeight: FontWeight.w500),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: GoogleFonts.epilogue(color: Colors.grey.shade400, fontSize: 14),
+        filled: true,
+        fillColor: const Color(0xFFF8F8F8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          validator: validator,
-          style: GoogleFonts.epilogue(fontSize: 14, color: Colors.black87),
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade300),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primaryColor),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
-      ],
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primaryColor, width: 1),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      ),
     );
   }
 }
