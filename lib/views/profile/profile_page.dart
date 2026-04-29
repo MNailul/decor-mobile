@@ -9,7 +9,9 @@ import 'guest_profile_page.dart';
 import 'address_management_page.dart';
 import 'edit_profile_page.dart';
 import 'orders_page.dart';
+import 'returns_page.dart';
 import 'consultation_history_page.dart';
+import '../wishlist/wishlist_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -159,11 +161,11 @@ class ProfilePage extends StatelessWidget {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: _buildQuickActionItem(Icons.keyboard_return_outlined, 'Returns'),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildQuickActionItem(Icons.favorite_border_outlined, 'Wishlist'),
+                            child: _buildQuickActionItem(
+                              Icons.favorite_border_outlined, 
+                              'Wishlist',
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const WishlistPage())),
+                            ),
                           ),
                         ],
                       ),

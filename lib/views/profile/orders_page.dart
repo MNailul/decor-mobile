@@ -3,9 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/order_provider.dart';
 import '../../models/order_model.dart';
-import '../order/track_order_page.dart';
+import '../order/order_details_page.dart';
 import '../order/invoice_page.dart';
 import 'write_review_page.dart';
+import '../order/return_request_page.dart';
 import 'package:intl/intl.dart';
 
 class OrdersPage extends StatelessWidget {
@@ -178,24 +179,24 @@ class OrdersPage extends StatelessWidget {
 
           const Divider(height: 32),
           
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'TOTAL AMOUNT',
-                    style: GoogleFonts.epilogue(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
-                  ),
-                  Text(
-                    '\$${order.totalAmount.toStringAsFixed(2)}',
-                    style: GoogleFonts.epilogue(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor),
-                  ),
-                ],
-              ),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'TOTAL AMOUNT',
+                        style: GoogleFonts.epilogue(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey.shade500),
+                      ),
+                      Text(
+                        '\$${order.totalAmount.toStringAsFixed(2)}',
+                        style: GoogleFonts.epilogue(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor),
+                      ),
+                    ],
+                  ),
                   TextButton(
                     onPressed: () {
                       Navigator.push(
@@ -205,45 +206,72 @@ class OrdersPage extends StatelessWidget {
                         ),
                       );
                     },
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey.shade600,
-                    ),
                     child: Text(
                       'INVOICE',
                       style: GoogleFonts.epilogue(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (order.status == OrderStatus.delivered) {
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder: (context, animation, secondaryAnimation) => WriteReviewPage(order: order),
-                          ),
-                        );
-                      } else {
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (order.status == OrderStatus.delivered) ...[
+                    TextButton(
+                      onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => TrackOrderPage(order: order),
+                            builder: (context) => ReturnRequestPage(
+                              product: order.items.first.product,
+                              orderId: order.id,
+                            ),
                           ),
                         );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFB5733A),
+                      ),
+                      child: Text(
+                        'RETURN',
+                        style: GoogleFonts.epilogue(fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1),
+                      ),
                     ),
-                    child: Text(
-                      order.status == OrderStatus.delivered 
-                          ? 'Leave Review' 
-                          : (isOrdered ? 'Track Order' : 'Order Details'),
-                      style: GoogleFonts.epilogue(fontSize: 12, fontWeight: FontWeight.w600),
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (order.status == OrderStatus.delivered) {
+                          Navigator.push(
+                            context,
+                            PageRouteBuilder(
+                              pageBuilder: (context, animation, secondaryAnimation) => WriteReviewPage(order: order),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => OrderDetailsPage(order: order),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        order.status == OrderStatus.delivered 
+                            ? 'Leave Review' 
+                            : (isOrdered ? 'Track Order' : 'Order Details'),
+                        style: GoogleFonts.epilogue(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],

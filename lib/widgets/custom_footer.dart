@@ -8,11 +8,11 @@ class CustomFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         children: [
           const Divider(color: Colors.black12),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           const Text(
             'DECOR',
             style: TextStyle(
@@ -42,7 +42,7 @@ class CustomFooter extends StatelessWidget {
               _buildFooterLink(context, 'Contact'),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

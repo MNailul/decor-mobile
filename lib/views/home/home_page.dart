@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../cart/cart_page.dart';
 import '../profile/profile_page.dart';
+import '../wishlist/wishlist_page.dart';
 import '../product/product_list_page.dart';
 import '../search/search_page.dart';
 import '../designer/designer_list_page.dart';
@@ -208,6 +209,25 @@ class _HomePageState extends State<HomePage> {
                         border: Border.all(color: Colors.grey.shade100),
                       ),
                       child: const Icon(Icons.auto_awesome, color: Colors.black87, size: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WishlistPage()),
+                      );
+                    },
+                    child: Container(
+                      height: 48,
+                      width: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.grey.shade100),
+                      ),
+                      child: const Icon(Icons.favorite_border, color: Colors.black87, size: 20),
                     ),
                   ),
                 ],

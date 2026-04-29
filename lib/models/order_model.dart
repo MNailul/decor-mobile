@@ -7,7 +7,7 @@ class OrderItem {
   OrderItem({required this.product, required this.quantity});
 }
 
-enum OrderStatus { ordered, processing, shipped, delivered, cancelled }
+enum OrderStatus { ordered, processing, shipped, delivered, cancelled, returning }
 
 class OrderModel {
   final String id;

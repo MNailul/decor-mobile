@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/product_model.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/wishlist_provider.dart';
 import '../../widgets/custom_footer.dart';
 import '../../widgets/bounce_tap.dart';
 import '../shop/shop_profile_page.dart';
@@ -265,9 +266,32 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                           ),
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.favorite_border, color: Colors.black54),
-                        onPressed: () {},
+                      Consumer<WishlistProvider>(
+                        builder: (context, wishlist, child) {
+                          final isLiked = wishlist.isWishlisted(widget.product.id);
+                          return IconButton(
+                            icon: Icon(
+                              isLiked ? Icons.favorite : Icons.favorite_border,
+                              color: isLiked ? Colors.redAccent : Colors.black54,
+                            ),
+                            onPressed: () {
+                              wishlist.toggleWishlist(widget.product);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isLiked 
+                                      ? '${widget.product.name} removed from Wishlist' 
+                                      : '${widget.product.name} added to Wishlist'
+                                  ),
+                                  backgroundColor: isLiked ? Colors.black87 : AppColors.primaryColor,
+                                  duration: const Duration(seconds: 1),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                ),
+                              );
+                            },
+                          );
+                        },
                       ),
                     ],
                   ),
