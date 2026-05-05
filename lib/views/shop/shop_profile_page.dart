@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../models/product_model.dart';
 import '../../providers/cart_provider.dart';
 import '../product/product_detail_page.dart';
+import '../chat/chat_detail_page.dart';
 import '../../widgets/bounce_tap.dart';
 
 class ShopProfilePage extends StatelessWidget {
@@ -104,21 +105,42 @@ class ShopProfilePage extends StatelessWidget {
                             ],
                           ),
                         ),
-                        ElevatedButton(
-                          onPressed: () {},
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: primaryColor,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
+                        Row(
+                          children: [
+                            IconButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ChatDetailPage(shopName: shopName),
+                                  ),
+                                );
+                              },
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.all(8),
+                              ),
+                              icon: const Icon(Icons.chat_bubble_outline, size: 20),
                             ),
-                          ),
-                          child: Text(
-                            'Follow',
-                            style: GoogleFonts.epilogue(fontWeight: FontWeight.bold, fontSize: 13),
-                          ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: () {},
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: primaryColor,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              child: Text(
+                                'Follow',
+                                style: GoogleFonts.epilogue(fontWeight: FontWeight.bold, fontSize: 13),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -161,7 +183,7 @@ class ShopProfilePage extends StatelessWidget {
                     children: [
                       _buildStatItem('124', 'Products'),
                       _buildStatItem('4.9', 'Rating'),
-                      _buildStatItem('98%', 'Chat Response'),
+                      _buildStatItem('2.4k', 'Sales'),
                     ],
                   ),
                   const SizedBox(height: 16),

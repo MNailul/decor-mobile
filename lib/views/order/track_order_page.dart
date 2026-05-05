@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/order_model.dart';
+import '../chat/chat_detail_page.dart';
 import 'package:intl/intl.dart';
 
 class TrackOrderPage extends StatelessWidget {
@@ -16,6 +17,9 @@ class TrackOrderPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('MMM dd, yyyy').format(order.orderDate);
+    final shopName = order.items.isNotEmpty 
+        ? order.items.first.product.shopName 
+        : 'Decor Official Store';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -32,10 +36,23 @@ class TrackOrderPage extends StatelessWidget {
           style: GoogleFonts.epilogue(
             color: Colors.black,
             fontWeight: FontWeight.w700,
-            fontSize: 16,
+            fontSize: 14,
             letterSpacing: 1.5,
           ),
         ),
+        actions: [
+          // VERY VISIBLE CHAT BUTTON IN APPBAR
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline, color: primaryColor),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName)),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -108,67 +125,6 @@ class TrackOrderPage extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             _buildTrackingTimeline(),
-
-            const SizedBox(height: 40),
-
-            // Courier Info Section
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      image: DecorationImage(
-                        image: NetworkImage('https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&q=80'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Michael Anderson',
-                          style: GoogleFonts.epilogue(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: textColor,
-                          ),
-                        ),
-                        Text(
-                          'Your Dedicated Courier',
-                          style: GoogleFonts.epilogue(
-                            fontSize: 12,
-                            color: lightTextColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.grey.shade200),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.phone_outlined, color: primaryColor, size: 20),
-                      onPressed: () {},
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
             const SizedBox(height: 40),
 
@@ -254,7 +210,47 @@ class TrackOrderPage extends StatelessWidget {
                 height: 1.6,
               ),
             ),
-            const SizedBox(height: 48),
+            
+            const SizedBox(height: 40),
+
+            // BIG ACTION BUTTON AT BOTTOM
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName)),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: primaryColor,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: primaryColor, width: 1.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.chat_bubble_outline, size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      'NEED HELP? CHAT SELLER',
+                      style: GoogleFonts.epilogue(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 60),
           ],
         ),
       ),

@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/order_provider.dart';
 import '../../models/order_model.dart';
-import '../order/order_details_page.dart';
+import '../order/track_order_page.dart';
 import '../order/invoice_page.dart';
 import 'write_review_page.dart';
 import '../order/return_request_page.dart';
@@ -254,7 +254,7 @@ class OrdersPage extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => OrderDetailsPage(order: order),
+                              builder: (context) => TrackOrderPage(order: order),
                             ),
                           );
                         }

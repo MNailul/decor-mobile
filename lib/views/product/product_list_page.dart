@@ -3,29 +3,50 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/cart_provider.dart';
+import '../../providers/wishlist_provider.dart';
 import '../../models/product_model.dart';
 import 'product_detail_page.dart';
 import '../../widgets/custom_footer.dart';
 import '../search/search_page.dart';
 import 'widgets/filter_bottom_sheet.dart';
 import '../../widgets/bounce_tap.dart';
+import '../../widgets/animated_wishlist_button.dart';
 
 
 class ProductListPage extends StatefulWidget {
   final bool showBackButton;
-  const ProductListPage({super.key, this.showBackButton = true});
+  final String? initialCategory;
+  
+  const ProductListPage({
+    super.key, 
+    this.showBackButton = true,
+    this.initialCategory,
+  });
 
   @override
   State<ProductListPage> createState() => _ProductListPageState();
 }
 
 class _ProductListPageState extends State<ProductListPage> {
-  final List<String> categories = ['All', 'Sofa', 'Table', 'Chair', 'Decor', 'Lighting'];
+  final List<String> categories = ['All', 'Sofa', 'Table', 'Chair', 'Storage', 'Lighting'];
   int selectedCategoryIndex = 0;
 
   RangeValues? _filterPriceRange;
   String? _filterMaterial;
   String? _filterStyle;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialCategory != null) {
+      final index = categories.indexWhere(
+        (cat) => cat.toLowerCase() == widget.initialCategory!.toLowerCase()
+      );
+      if (index != -1) {
+        selectedCategoryIndex = index;
+      }
+    }
+  }
 
   List<FurnitureProduct> get filteredProducts {
     return dummyCatalog.where((product) {
@@ -100,25 +121,22 @@ class _ProductListPageState extends State<ProductListPage> {
                         ),
                       );
                     },
-                    child: Hero(
-                      tag: 'search_bar',
-                      child: Material(
-                        type: MaterialType.transparency,
-                        child: Container(
-                          height: 48,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: Colors.grey.shade100),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.search, color: Colors.grey, size: 20),
-                              const SizedBox(width: 8),
-                              Text('Search products...', style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
-                            ],
-                          ),
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Container(
+                        height: 48,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: Colors.grey.shade100),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search, color: Colors.grey, size: 20),
+                            const SizedBox(width: 8),
+                            Text('Search products...', style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
+                          ],
                         ),
                       ),
                     ),
@@ -246,27 +264,23 @@ class _ProductListPageState extends State<ProductListPage> {
                             Positioned(
                               top: 12,
                               right: 12,
-                              child: BounceTap(
-                                onTap: () {
-                                  context.read<CartProvider>().addToCart(product);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('${product.name} added to cart'),
-                                      duration: const Duration(seconds: 2),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.add_shopping_cart,
-                                    size: 16,
-                                    color: Colors.black87,
-                                  ),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Consumer<WishlistProvider>(
+                                  builder: (context, wishlist, child) {
+                                    final isLiked = wishlist.isWishlisted(product.id);
+                                    return AnimatedWishlistButton(
+                                      size: 16,
+                                      initialIsLiked: isLiked,
+                                      onChanged: (liked) {
+                                        wishlist.toggleWishlist(product);
+                                      },
+                                    );
+                                  },
                                 ),
                               ),
                             ),

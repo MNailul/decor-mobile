@@ -7,6 +7,7 @@ import '../../providers/cart_provider.dart';
 import '../../providers/wishlist_provider.dart';
 import '../../widgets/custom_footer.dart';
 import '../../widgets/bounce_tap.dart';
+import '../../widgets/animated_wishlist_button.dart';
 import '../shop/shop_profile_page.dart';
 
 class ProductDetailPage extends StatefulWidget {
@@ -269,26 +270,11 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                       Consumer<WishlistProvider>(
                         builder: (context, wishlist, child) {
                           final isLiked = wishlist.isWishlisted(widget.product.id);
-                          return IconButton(
-                            icon: Icon(
-                              isLiked ? Icons.favorite : Icons.favorite_border,
-                              color: isLiked ? Colors.redAccent : Colors.black54,
-                            ),
-                            onPressed: () {
+                          return AnimatedWishlistButton(
+                            size: 28,
+                            initialIsLiked: isLiked,
+                            onChanged: (liked) {
                               wishlist.toggleWishlist(widget.product);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    isLiked 
-                                      ? '${widget.product.name} removed from Wishlist' 
-                                      : '${widget.product.name} added to Wishlist'
-                                  ),
-                                  backgroundColor: isLiked ? Colors.black87 : AppColors.primaryColor,
-                                  duration: const Duration(seconds: 1),
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                              );
                             },
                           );
                         },
@@ -606,6 +592,33 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                   image: NetworkImage(product.imagePath),
                   fit: BoxFit.cover,
                 ),
+              ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Consumer<WishlistProvider>(
+                        builder: (context, wishlist, child) {
+                          final isLiked = wishlist.isWishlisted(product.id);
+                          return AnimatedWishlistButton(
+                            size: 14,
+                            initialIsLiked: isLiked,
+                            onChanged: (liked) {
+                              wishlist.toggleWishlist(product);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),

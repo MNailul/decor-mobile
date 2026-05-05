@@ -5,6 +5,7 @@ import '../../models/order_model.dart';
 import '../../core/theme/app_colors.dart';
 import '../../widgets/bounce_tap.dart';
 import 'return_request_page.dart';
+import '../chat/chat_detail_page.dart';
 
 class OrderDetailsPage extends StatelessWidget {
   final OrderModel order;
@@ -41,6 +42,21 @@ class OrderDetailsPage extends StatelessWidget {
             fontSize: 18,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.chat_bubble_outline, color: primaryColor),
+            onPressed: () {
+              final shopName = order.items.isNotEmpty 
+                  ? order.items.first.product.shopName 
+                  : 'Decor Official Store';
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName)),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -72,6 +88,48 @@ class OrderDetailsPage extends StatelessWidget {
 
             // Payment Summary
             _buildPaymentSummary(),
+            const SizedBox(height: 32),
+
+            // ADD CHAT SELLER BUTTON HERE TOO
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  final shopName = order.items.isNotEmpty 
+                      ? order.items.first.product.shopName 
+                      : 'Decor Official Store';
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName)),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: primaryColor,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: primaryColor, width: 1.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.chat_bubble_outline, size: 20),
+                    const SizedBox(width: 12),
+                    Text(
+                      'NEED HELP? CHAT SELLER',
+                      style: GoogleFonts.epilogue(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             const SizedBox(height: 48),
           ],
         ),

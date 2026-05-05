@@ -6,9 +6,14 @@ import '../profile/profile_page.dart';
 import '../wishlist/wishlist_page.dart';
 import '../product/product_list_page.dart';
 import '../search/search_page.dart';
+import '../ai/ai_generative_page.dart';
 import '../designer/designer_list_page.dart';
+import '../designer/designer_profile_page.dart';
 import '../../widgets/custom_footer.dart';
 import '../../widgets/bounce_tap.dart';
+import '../../providers/cart_provider.dart';
+import '../../models/product_model.dart';
+import '../product/product_detail_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,6 +25,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
   final ScrollController _scrollController = ScrollController();
+  final PageController _featuredPageController = PageController();
+  int _currentFeaturedPage = 0;
   Timer? _timer;
 
   @override
@@ -32,6 +39,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _timer?.cancel();
     _scrollController.dispose();
+    _featuredPageController.dispose();
     super.dispose();
   }
 
@@ -198,7 +206,10 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 12),
                   GestureDetector(
                     onTap: () {
-                      // TODO: Redirect to Generative Design AI page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AiGenerativePage()),
+                      );
                     },
                     child: Container(
                       height: 48,
@@ -318,7 +329,7 @@ class _HomePageState extends State<HomePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Collections', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const Text('Categories', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -339,15 +350,15 @@ class _HomePageState extends State<HomePage> {
                   scrollDirection: Axis.horizontal,
                   clipBehavior: Clip.none,
                   children: [
-                    _buildCollectionCard('Textiles', 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=80'),
+                    _buildCollectionCard('Sofa', 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=400&q=80'),
                     const SizedBox(width: 16),
-                    _buildCollectionCard('Objects', 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&q=80'),
+                    _buildCollectionCard('Table', 'https://images.unsplash.com/photo-1577140917170-285929fb55b7?w=400&q=80'),
                     const SizedBox(width: 16),
-                    _buildCollectionCard('Furniture', 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80'),
+                    _buildCollectionCard('Chair', 'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=400&q=80'),
                     const SizedBox(width: 16),
                     _buildCollectionCard('Lighting', 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&q=80'),
                     const SizedBox(width: 16),
-                    _buildCollectionCard('Art', 'https://images.unsplash.com/photo-1544457070-4cd773b4d71e?w=400&q=80'),
+                    _buildCollectionCard('Storage', 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=400&q=80'),
                   ],
                 ),
               ),
@@ -369,37 +380,132 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               const SizedBox(height: 20),
-              // Featured New Arrival
-              Container(
-                height: 200,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: AppColors.secondaryColor,
-                  image: const DecorationImage(
-                    image: AssetImage('assets/images/featured_arrival.png'),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                      child: const Text('FEATURED', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+              // Featured New Arrival Slideshow
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    height: 220,
+                    child: PageView.builder(
+                      controller: _featuredPageController,
+                      onPageChanged: (index) {
+                        setState(() => _currentFeaturedPage = index);
+                      },
+                      itemCount: 3,
+                      itemBuilder: (context, index) {
+                        final bannerImages = [
+                          'assets/images/featured_arrival.png',
+                          'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80',
+                          'https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=800&q=80',
+                        ];
+                        final bannerTitles = ['NEW COLLECTION', 'LIMITED EDITION', 'DESIGNER PICK'];
+                        
+                        return Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: AppColors.secondaryColor,
+                            image: DecorationImage(
+                              image: bannerImages[index].startsWith('http') 
+                                  ? NetworkImage(bannerImages[index]) as ImageProvider
+                                  : AssetImage(bannerImages[index]),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(16),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Colors.black.withOpacity(0.1), Colors.black.withOpacity(0.4)],
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(16.0),
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                                child: Text(
+                                  bannerTitles[index], 
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
-                ),
+                  
+                  // Left Arrow
+                  Positioned(
+                    left: 8,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white.withOpacity(0.5),
+                      radius: 16,
+                      child: IconButton(
+                        icon: const Icon(Icons.chevron_left, size: 16, color: Colors.black),
+                        onPressed: () {
+                          _featuredPageController.previousPage(
+                            duration: const Duration(milliseconds: 300), 
+                            curve: Curves.easeInOut
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  
+                  // Right Arrow
+                  Positioned(
+                    right: 8,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.white.withOpacity(0.5),
+                      radius: 16,
+                      child: IconButton(
+                        icon: const Icon(Icons.chevron_right, size: 16, color: Colors.black),
+                        onPressed: () {
+                          _featuredPageController.nextPage(
+                            duration: const Duration(milliseconds: 300), 
+                            curve: Curves.easeInOut
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              // Product List
+              const SizedBox(height: 12),
+              // Indicator Dots
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(3, (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 6,
+                  width: _currentFeaturedPage == index ? 16 : 6,
+                  decoration: BoxDecoration(
+                    color: _currentFeaturedPage == index ? AppColors.primaryColor : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                )),
+              ),
+              const SizedBox(height: 24),
+              // Product List (Using real dummy products)
               Row(
                 children: [
-                  Expanded(child: _buildProductCard('The Plinth Cushion', '\$115', 'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=400&q=80')),
+                  Expanded(
+                    child: _buildProductCard(
+                      dummyCatalog[0], // Terra Ambiance Chair
+                    ),
+                  ),
                   const SizedBox(width: 16),
-                  Expanded(child: _buildProductCard('Orbital Tray', '\$89', 'https://images.unsplash.com/photo-1616486029423-aaa4789e8c9a?w=400&q=80')),
+                  Expanded(
+                    child: _buildProductCard(
+                      dummyCatalog[3], // Lumina Pendant Light
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 48),
@@ -432,7 +538,12 @@ class _HomePageState extends State<HomePage> {
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const AiGenerativePage()),
+                          );
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: AppColors.primaryColor,
@@ -456,7 +567,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const DesignerListPage()),
+                        MaterialPageRoute(builder: (context) => DesignerListPage()),
                       );
                     },
                     child: const Text('VIEW ALL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1, color: AppColors.primaryColor)),
@@ -470,11 +581,51 @@ class _HomePageState extends State<HomePage> {
                   scrollDirection: Axis.horizontal,
                   clipBehavior: Clip.none,
                   children: [
-                    _buildDesignerCard('Sarah Jen', 'Interior Architect', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80'),
+                    _buildDesignerCard({
+                      'name': 'Sarah Chen',
+                      'specialty': 'Minimalist Living',
+                      'image': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
+                      'rating': '4.9',
+                      'bio': 'Award-winning architect specializing in clean lines and natural light.',
+                      'price': 'Mulai Rp 500k',
+                      'isOnline': true,
+                      'isVerified': true,
+                      'portfolio': [
+                        'https://images.unsplash.com/photo-1618220179428-22790b46a0eb?w=200&q=80',
+                        'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=200&q=80',
+                        'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=200&q=80',
+                      ]
+                    }),
                     const SizedBox(width: 16),
-                    _buildDesignerCard('Mark Doe', 'Space Planner', 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80'),
+                    _buildDesignerCard({
+                      'name': 'Mark Doe',
+                      'specialty': 'Space Planner',
+                      'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
+                      'rating': '4.8',
+                      'bio': 'Expert in maximizing small spaces without compromising aesthetics.',
+                      'price': 'Mulai Rp 400k',
+                      'isOnline': false,
+                      'isVerified': true,
+                      'portfolio': [
+                        'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&q=80',
+                        'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&q=80',
+                      ]
+                    }),
                     const SizedBox(width: 16),
-                    _buildDesignerCard('Alia Smith', 'Decor Specialist', 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&q=80'),
+                    _buildDesignerCard({
+                      'name': 'Alia Smith',
+                      'specialty': 'Decor Specialist',
+                      'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&q=80',
+                      'rating': '4.7',
+                      'bio': 'Bringing warmth and texture to modern spaces with curated decor.',
+                      'price': 'Mulai Rp 350k',
+                      'isOnline': true,
+                      'isVerified': false,
+                      'portfolio': [
+                        'https://images.unsplash.com/photo-1616486029423-aaa4789e8c9a?w=400&q=80',
+                        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=80',
+                      ]
+                    }),
                   ],
                 ),
               ),
@@ -510,7 +661,7 @@ class _HomePageState extends State<HomePage> {
                   Expanded(child: _buildEthosImage('https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=200&q=80')),
                 ],
               ),
-              const CustomFooter(),
+              CustomFooter(),
               const SizedBox(height: 100),
             ],
           ),
@@ -519,47 +670,67 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildCollectionCard(String title, String imageUrl) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 160,
-          height: 190,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: AppColors.secondaryColor,
-            image: DecorationImage(
-              image: NetworkImage(imageUrl),
-              fit: BoxFit.cover,
+    return BounceTap(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductListPage(initialCategory: title),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 160,
+            height: 190,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: AppColors.secondaryColor,
+              image: DecorationImage(
+                image: NetworkImage(imageUrl),
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-      ],
+          const SizedBox(height: 12),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+        ],
+      ),
     );
   }
 
-  Widget _buildProductCard(String name, String price, String imageUrl) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          height: 180,
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            image: DecorationImage(
-              image: NetworkImage(imageUrl),
-              fit: BoxFit.cover,
+  Widget _buildProductCard(FurnitureProduct product) {
+    return BounceTap(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProductDetailPage(product: product),
+          ),
+        );
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 180,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(12),
+              image: DecorationImage(
+                image: NetworkImage(product.imagePath),
+                fit: BoxFit.cover,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-        const SizedBox(height: 6),
-        Text(price, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-      ],
+          const SizedBox(height: 16),
+          Text(product.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 6),
+          Text('\$${product.price.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+        ],
+      ),
     );
   }
 
@@ -576,7 +747,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildDesignerCard(String name, String role, String imageUrl) {
+  Widget _buildDesignerCard(Map<String, dynamic> designer) {
     return Container(
       width: 140,
       padding: const EdgeInsets.all(16),
@@ -590,18 +761,36 @@ class _HomePageState extends State<HomePage> {
         children: [
           CircleAvatar(
             radius: 36,
-            backgroundImage: NetworkImage(imageUrl),
+            backgroundImage: NetworkImage(designer['image']),
             backgroundColor: AppColors.secondaryColor,
           ),
           const SizedBox(height: 12),
-          Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          Text(
+            designer['name'], 
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 4),
-          Text(role, style: TextStyle(color: Colors.grey.shade500, fontSize: 11), textAlign: TextAlign.center),
+          Text(
+            designer['specialty'], 
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 11), 
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const Spacer(),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DesignerProfilePage(designer: designer),
+                  ),
+                );
+              },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: AppColors.primaryColor),
                 padding: const EdgeInsets.symmetric(vertical: 8),

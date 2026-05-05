@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../auth/login_page.dart';
 import 'designer_booking_page.dart';
 
 class DesignerProfilePage extends StatelessWidget {
@@ -341,12 +344,32 @@ class DesignerProfilePage extends StatelessWidget {
           height: 54,
           child: ElevatedButton(
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DesignerBookingPage(designer: designer),
-                ),
-              );
+              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              
+              if (authProvider.isLoggedIn) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DesignerBookingPage(designer: designer),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Please login to book a consultation'),
+                    behavior: SnackBarBehavior.floating,
+                    action: SnackBarAction(
+                      label: 'LOGIN',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LoginPage()),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
