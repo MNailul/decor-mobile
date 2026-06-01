@@ -36,14 +36,20 @@ class _ConsultationChatPageState extends State<ConsultationChatPage> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundImage: NetworkImage(widget.consultation.designerImage),
+              backgroundImage: widget.consultation.designerImage != null 
+                  ? NetworkImage(widget.consultation.designerImage!) 
+                  : null,
+              backgroundColor: secondaryColor,
+              child: widget.consultation.designerImage == null 
+                  ? const Icon(Icons.person, size: 18, color: Colors.white) 
+                  : null,
             ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.consultation.designerName,
+                  widget.consultation.designerName ?? 'Expert Designer',
                   style: GoogleFonts.epilogue(
                     color: textColor,
                     fontWeight: FontWeight.bold,
@@ -159,7 +165,13 @@ class _ConsultationChatPageState extends State<ConsultationChatPage> {
               if (!isMe) ...[
                 CircleAvatar(
                   radius: 14,
-                  backgroundImage: NetworkImage(widget.consultation.designerImage),
+                  backgroundImage: widget.consultation.designerImage != null 
+                      ? NetworkImage(widget.consultation.designerImage!) 
+                      : null,
+                  backgroundColor: secondaryColor,
+                  child: widget.consultation.designerImage == null 
+                      ? const Icon(Icons.person, size: 14, color: Colors.white) 
+                      : null,
                 ),
                 const SizedBox(width: 12),
               ],
@@ -191,7 +203,7 @@ class _ConsultationChatPageState extends State<ConsultationChatPage> {
           Padding(
             padding: EdgeInsets.only(left: isMe ? 0 : 40, right: isMe ? 4 : 0),
             child: Text(
-              '${!isMe ? widget.consultation.designerName.toUpperCase() + " • " : ""}${msg['time']}',
+              '${!isMe ? (widget.consultation.designerName ?? 'Expert Designer').toUpperCase() + " • " : ""}${msg['time']}',
               style: GoogleFonts.epilogue(
                 color: Colors.grey.shade400,
                 fontSize: 10,

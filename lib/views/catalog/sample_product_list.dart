@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../models/product_model.dart';
 import '../../services/api_service.dart';
 import '../../widgets/animated_wishlist_button.dart';
+import '../../core/utils/currency_formatter.dart';
+
 
 class SampleProductList extends StatefulWidget {
   const SampleProductList({super.key});
@@ -124,7 +126,7 @@ class _SampleProductListState extends State<SampleProductList> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "\$${product.price.toStringAsFixed(2)}",
+                          product.price.toIDR(),
                           style: const TextStyle(
                             color: Colors.brown,
                             fontWeight: FontWeight.bold,

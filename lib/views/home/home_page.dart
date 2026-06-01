@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../cart/cart_page.dart';
 import '../profile/profile_page.dart';
@@ -14,6 +15,12 @@ import '../../widgets/bounce_tap.dart';
 import '../../providers/cart_provider.dart';
 import '../../models/product_model.dart';
 import '../product/product_detail_page.dart';
+import '../../core/utils/currency_formatter.dart';
+import '../../providers/product_provider.dart';
+import '../../providers/designer_provider.dart';
+import '../../models/designer_model.dart';
+
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -33,6 +40,10 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _startAutoScroll();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProductProvider>().loadProducts();
+      context.read<DesignerProvider>().loadDesigners();
+    });
   }
 
   @override
@@ -65,6 +76,13 @@ class _HomePageState extends State<HomePage> {
         }
       }
     });
+  }
+
+  Future<void> _onRefresh() async {
+    await Future.wait([
+      context.read<ProductProvider>().loadProducts(),
+      context.read<DesignerProvider>().loadDesigners(),
+    ]);
   }
 
   @override
@@ -157,11 +175,15 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildHomeContent() {
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+      child: RefreshIndicator(
+        onRefresh: _onRefresh,
+        color: AppColors.primaryColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+              children: [
               const SizedBox(height: 16),
               // Search bar & AI Icon
               Row(
@@ -270,11 +292,9 @@ class _HomePageState extends State<HomePage> {
               // CTA button
               ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const ProductListPage()),
-                  );
+                  setState(() => _currentIndex = 1);
                 },
+
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor,
                   foregroundColor: Colors.white,
@@ -354,11 +374,11 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(width: 16),
                     _buildCollectionCard('Table', 'https://images.unsplash.com/photo-1577140917170-285929fb55b7?w=400&q=80'),
                     const SizedBox(width: 16),
-                    _buildCollectionCard('Chair', 'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=400&q=80'),
+                    _buildCollectionCard('Living Room', 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=400&q=80'),
+                    const SizedBox(width: 16),
+                    _buildCollectionCard('Bedroom', 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?w=400&q=80'),
                     const SizedBox(width: 16),
                     _buildCollectionCard('Lighting', 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=400&q=80'),
-                    const SizedBox(width: 16),
-                    _buildCollectionCard('Storage', 'https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=400&q=80'),
                   ],
                 ),
               ),
@@ -492,22 +512,40 @@ class _HomePageState extends State<HomePage> {
                 )),
               ),
               const SizedBox(height: 24),
-              // Product List (Using real dummy products)
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildProductCard(
-                      dummyCatalog[0], // Terra Ambiance Chair
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildProductCard(
-                      dummyCatalog[3], // Lumina Pendant Light
-                    ),
-                  ),
-                ],
+              // Product List (Using real products from API)
+              Consumer<ProductProvider>(
+                builder: (context, productProvider, child) {
+                  if (productProvider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  final products = productProvider.products;
+                  if (products.isEmpty) {
+                    // Fallback to dummy if API fails or is empty for now
+                    return Row(
+                      children: [
+                        Expanded(child: _buildProductCard(dummyCatalog[0])),
+                        const SizedBox(width: 16),
+                        Expanded(child: _buildProductCard(dummyCatalog[3])),
+                      ],
+                    );
+                  }
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: _buildProductCard(products[0].toFurnitureProduct()),
+                      ),
+                      const SizedBox(width: 16),
+                      if (products.length > 1)
+                        Expanded(
+                          child: _buildProductCard(products[1].toFurnitureProduct()),
+                        ),
+                    ],
+                  );
+                },
               ),
+
               const SizedBox(height: 48),
               // AI Section
               Container(
@@ -567,7 +605,7 @@ class _HomePageState extends State<HomePage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => DesignerListPage()),
+                        MaterialPageRoute(builder: (context) => const DesignerListPage()),
                       );
                     },
                     child: const Text('VIEW ALL', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1, color: AppColors.primaryColor)),
@@ -576,57 +614,30 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 20),
               SizedBox(
-                height: 200,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  children: [
-                    _buildDesignerCard({
-                      'name': 'Sarah Chen',
-                      'specialty': 'Minimalist Living',
-                      'image': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
-                      'rating': '4.9',
-                      'bio': 'Award-winning architect specializing in clean lines and natural light.',
-                      'price': 'Mulai Rp 500k',
-                      'isOnline': true,
-                      'isVerified': true,
-                      'portfolio': [
-                        'https://images.unsplash.com/photo-1618220179428-22790b46a0eb?w=200&q=80',
-                        'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=200&q=80',
-                        'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=200&q=80',
-                      ]
-                    }),
-                    const SizedBox(width: 16),
-                    _buildDesignerCard({
-                      'name': 'Mark Doe',
-                      'specialty': 'Space Planner',
-                      'image': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
-                      'rating': '4.8',
-                      'bio': 'Expert in maximizing small spaces without compromising aesthetics.',
-                      'price': 'Mulai Rp 400k',
-                      'isOnline': false,
-                      'isVerified': true,
-                      'portfolio': [
-                        'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=400&q=80',
-                        'https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=400&q=80',
-                      ]
-                    }),
-                    const SizedBox(width: 16),
-                    _buildDesignerCard({
-                      'name': 'Alia Smith',
-                      'specialty': 'Decor Specialist',
-                      'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&q=80',
-                      'rating': '4.7',
-                      'bio': 'Bringing warmth and texture to modern spaces with curated decor.',
-                      'price': 'Mulai Rp 350k',
-                      'isOnline': true,
-                      'isVerified': false,
-                      'portfolio': [
-                        'https://images.unsplash.com/photo-1616486029423-aaa4789e8c9a?w=400&q=80',
-                        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=400&q=80',
-                      ]
-                    }),
-                  ],
+                height: 220,
+                child: Consumer<DesignerProvider>(
+                  builder: (context, provider, child) {
+                    if (provider.isLoading && provider.designers.isEmpty) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    
+                    if (provider.designers.isEmpty) {
+                      return const Center(child: Text('No designers available', style: TextStyle(fontSize: 12, color: Colors.grey)));
+                    }
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      clipBehavior: Clip.none,
+                      itemCount: provider.designers.length,
+                      itemBuilder: (context, index) {
+                        final designer = provider.designers[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 16.0),
+                          child: _buildDesignerCard(designer),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 48),
@@ -656,7 +667,7 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   Expanded(child: _buildEthosImage('https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=200&q=80')),
                   const SizedBox(width: 4),
-                  Expanded(child: _buildEthosImage('https://images.unsplash.com/photo-1618220179428-22790b46a0eb?w=200&q=80')),
+                  Expanded(child: _buildEthosImage('https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=200&q=80')),
                   const SizedBox(width: 4),
                   Expanded(child: _buildEthosImage('https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=200&q=80')),
                 ],
@@ -666,7 +677,8 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildCollectionCard(String title, String imageUrl) {
@@ -704,12 +716,13 @@ class _HomePageState extends State<HomePage> {
   Widget _buildProductCard(FurnitureProduct product) {
     return BounceTap(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProductDetailPage(product: product),
-          ),
-        );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProductDetailPage(product: product, heroTag: 'home_${product.id}'),
+            ),
+          );
+
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -719,16 +732,24 @@ class _HomePageState extends State<HomePage> {
             decoration: BoxDecoration(
               color: Colors.grey.shade50,
               borderRadius: BorderRadius.circular(12),
-              image: DecorationImage(
-                image: NetworkImage(product.imagePath),
-                fit: BoxFit.cover,
+            ),
+            child: Hero(
+              tag: 'home_${product.id}',
+
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  product.imagePath,
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
           ),
+
           const SizedBox(height: 16),
           Text(product.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           const SizedBox(height: 6),
-          Text('\$${product.price.toStringAsFixed(2)}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+          Text(product.price.toIDR(), style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
         ],
       ),
     );
@@ -747,7 +768,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildDesignerCard(Map<String, dynamic> designer) {
+  Widget _buildDesignerCard(DesignerModel designer) {
     return Container(
       width: 140,
       padding: const EdgeInsets.all(16),
@@ -759,21 +780,39 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
-            radius: 36,
-            backgroundImage: NetworkImage(designer['image']),
-            backgroundColor: AppColors.secondaryColor,
+          Stack(
+            children: [
+              CircleAvatar(
+                radius: 36,
+                backgroundImage: NetworkImage(designer.image),
+                backgroundColor: AppColors.secondaryColor,
+              ),
+              if (designer.isOpen)
+                Positioned(
+                  bottom: 0,
+                  right: 4,
+                  child: Container(
+                    width: 14,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade500,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
           Text(
-            designer['name'], 
+            designer.studioName, 
             style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
           Text(
-            designer['specialty'], 
+            designer.specialty, 
             style: TextStyle(color: Colors.grey.shade500, fontSize: 11), 
             textAlign: TextAlign.center,
             maxLines: 1,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../widgets/bounce_tap.dart';
+import '../../../core/utils/currency_formatter.dart';
+
 
 class FilterBottomSheet extends StatefulWidget {
   const FilterBottomSheet({super.key});
@@ -10,12 +12,16 @@ class FilterBottomSheet extends StatefulWidget {
 }
 
 class _FilterBottomSheetState extends State<FilterBottomSheet> {
-  RangeValues _priceRange = const RangeValues(200, 3500);
-  String _selectedMaterial = 'Oak';
-  String _selectedStyle = 'Modern';
+  RangeValues _priceRange = const RangeValues(500000, 25000000);
 
-  final List<String> _materials = ['Oak', 'Walnut', 'Fabric', 'Metal'];
-  final List<String> _styles = ['Minimalist', 'Modern', 'Classic'];
+  String _selectedCategory = 'All';
+  String _selectedStyle = 'All';
+
+  final List<String> _categories = [
+    'All', 'Sofa', 'Chair', 'Table', 'Bed', 'Lighting', 'Cabinet', 'Decor', 
+    'Living Room', 'Bedroom', 'Dining Room', 'Workspace', 'Kitchen', 'Outdoor', 'Decoration'
+  ];
+  final List<String> _styles = ['All', 'Minimalist', 'Modern', 'Classic'];
 
   @override
   Widget build(BuildContext context) {
@@ -64,9 +70,9 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                       BounceTap(
                         onTap: () {
                           setState(() {
-                            _priceRange = const RangeValues(200, 3500);
-                            _selectedMaterial = 'Oak';
-                            _selectedStyle = 'Modern';
+                            _priceRange = const RangeValues(500000, 25000000);
+                            _selectedCategory = 'All';
+                            _selectedStyle = 'All';
                           });
                         },
                         child: const Text(
@@ -92,7 +98,8 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     children: [
                       const Text('Price Range', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       Text(
-                        '\$${_priceRange.start.toInt()} — \$${_priceRange.end.toInt()}',
+                        '${_priceRange.start.toIDR()} — ${_priceRange.end.toIDR()}',
+
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primaryColor),
                       ),
                     ],
@@ -112,7 +119,8 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     child: RangeSlider(
                       values: _priceRange,
                       min: 0,
-                      max: 5000,
+                      max: 50000000,
+
                       onChanged: (values) {
                         setState(() {
                           _priceRange = values;
@@ -126,26 +134,27 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('\$0', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                      Text('\$5,000+', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                      Text(0.0.toIDR(), style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                      Text('50jt+', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+
                     ],
                   ),
                 ),
                 const SizedBox(height: 40),
 
-                // Material
+                // Category
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 24),
-                  child: Text('Material', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: Text('Category', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 16),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: _materials.map((m) => _buildChip(m, _selectedMaterial == m, (val) {
-                      setState(() => _selectedMaterial = m);
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: _categories.map((c) => _buildChip(c, _selectedCategory == c, (val) {
+                      setState(() => _selectedCategory = c);
                     })).toList(),
                   ),
                 ),
@@ -165,28 +174,6 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                     children: _styles.map((s) => _buildChip(s, _selectedStyle == s, (val) {
                       setState(() => _selectedStyle = s);
                     })).toList(),
-                  ),
-                ),
-                const SizedBox(height: 40),
-
-                // Featured Collections
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
-                  child: Text('Featured Collections', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 100,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    children: [
-                      _buildCollectionImage('https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200&q=80'),
-                      const SizedBox(width: 12),
-                      _buildCollectionImage('https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=200&q=80'),
-                      const SizedBox(width: 12),
-                      _buildCollectionImage('https://images.unsplash.com/photo-1505693314120-0d443867891c?w=200&q=80'),
-                    ],
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -219,7 +206,7 @@ class _FilterBottomSheetState extends State<FilterBottomSheet> {
                   onPressed: () {
                     Navigator.pop(context, {
                       'priceRange': _priceRange,
-                      'material': _selectedMaterial,
+                      'category': _selectedCategory,
                       'style': _selectedStyle,
                     });
                   },

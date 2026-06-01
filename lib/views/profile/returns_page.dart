@@ -127,7 +127,7 @@ class ReturnsPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Return for Order ${order.id}',
+            'Return for Order #${order.id}',
             style: GoogleFonts.epilogue(
               fontSize: 15,
               fontWeight: FontWeight.bold,
@@ -142,7 +142,7 @@ class ReturnsPage extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.network(
-                    item.product.imagePath,
+                    item.product?.imageUrl ?? 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200&q=80',
                     width: 50,
                     height: 50,
                     fit: BoxFit.cover,
@@ -154,7 +154,7 @@ class ReturnsPage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        item.product.name,
+                        item.product?.name ?? 'Unknown Product',
                         style: GoogleFonts.epilogue(fontSize: 14, fontWeight: FontWeight.w600),
                       ),
                       Text(

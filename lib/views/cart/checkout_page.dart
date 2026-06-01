@@ -3,8 +3,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/address_provider.dart';
+import '../../providers/order_provider.dart';
 import '../../models/address_model.dart';
-import 'qr_payment_page.dart';
+import '../../models/order_model.dart';
+import 'qr_payment_page.dart'; // Ini file yang isinya BankTransferPage
+import '../../core/utils/currency_formatter.dart';
+
 
 class CheckoutPage extends StatefulWidget {
   const CheckoutPage({super.key});
@@ -20,21 +24,44 @@ class _CheckoutPageState extends State<CheckoutPage> {
   static const Color textColor = Color(0xFF1E1E1E);
   static const Color lightTextColor = Color(0xFF757575);
 
-  // State for shipping/payment
-  double shippingPrice = 15.0;
-  final double taxes = 24.40; // Static for design consistency
+  final TextEditingController _voucherController = TextEditingController();
 
-  String selectedPaymentMethod = 'QR Code';
+  @override
+  void dispose() {
+    _voucherController.dispose();
+    super.dispose();
+  }
+
+  // State for shipping/payment
+  double shippingPrice = 25000.0;
+  final double taxes = 50000.0; // Static for design consistency
+
+
+  String selectedPaymentMethod = 'Bank Transfer';
   String selectedShippingMethod = 'Curated Delivery';
   AddressModel? selectedAddress;
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<CartProvider>(
-      builder: (context, cartProvider, child) {
+    return Consumer2<CartProvider, OrderProvider>(
+      builder: (context, cartProvider, orderProvider, child) {
         final selectedItems = cartProvider.selectedItems;
         final subtotal = cartProvider.totalAmount;
-        final grandTotal = subtotal + shippingPrice + taxes;
+        
+        double discount = 0;
+        if (orderProvider.selectedVoucher != null) {
+          final v = orderProvider.selectedVoucher!;
+          if (v.discountType == 'percentage') {
+            discount = subtotal * (v.discountValue / 100);
+            if (v.maxDiscount != null && discount > v.maxDiscount!) {
+              discount = v.maxDiscount!;
+            }
+          } else {
+            discount = v.discountValue;
+          }
+        }
+
+        final grandTotal = (subtotal - discount) + shippingPrice + taxes;
 
         return Scaffold(
           backgroundColor: Colors.white,
@@ -69,6 +96,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     const SizedBox(height: 20),
                     _buildPaymentMethodCard(),
                     const SizedBox(height: 32),
+                    _buildVoucherSection(orderProvider, subtotal),
+                    const SizedBox(height: 32),
                     Text(
                       'ORDER SUMMARY',
                       style: GoogleFonts.epilogue(
@@ -96,7 +125,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           ),
                         )),
                     const SizedBox(height: 12),
-                    _buildPriceBreakdown(subtotal, grandTotal),
+                    _buildPriceBreakdown(subtotal, discount, grandTotal),
                     const SizedBox(height: 20),
                   ],
                 ),
@@ -236,7 +265,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ),
           ),
           Text(
-            '\$${shippingPrice.toStringAsFixed(2)}',
+            shippingPrice.toIDR(),
             style: GoogleFonts.epilogue(
               color: textColor,
               fontWeight: FontWeight.w600,
@@ -269,7 +298,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
   }
 
   Widget _buildPaymentMethodCard() {
-    bool isQr = selectedPaymentMethod == 'QR Code';
+    bool isBankTransfer = selectedPaymentMethod == 'Bank Transfer';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
@@ -280,7 +309,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Row(
         children: [
           Icon(
-            isQr ? Icons.qr_code_scanner : Icons.account_balance,
+            isBankTransfer ? Icons.account_balance : Icons.payments_outlined,
             color: textColor,
             size: 28,
           ),
@@ -299,7 +328,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  isQr ? 'Scan QR with any app' : 'Virtual Account Number',
+                  isBankTransfer ? 'Virtual Account Number' : 'Pay when item arrives',
                   style: GoogleFonts.epilogue(
                     color: lightTextColor,
                     fontSize: 13,
@@ -332,6 +361,38 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
+  Future<void> _processCOD(BuildContext context, double amount) async {
+    final orderProvider = context.read<OrderProvider>();
+    
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: primaryColor)),
+    );
+
+    final order = await orderProvider.placeOrder(
+      paymentMethod: 'Cash on Delivery',
+      shippingCourier: selectedShippingMethod,
+    );
+
+    if (mounted) Navigator.pop(context); // Close loading
+
+    if (order != null && mounted) {
+      context.read<CartProvider>().fetchCart(); // Refresh cart
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => SuccessBottomSheet(amount: amount),
+      );
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(orderProvider.errorMessage ?? 'Failed to place order')),
+      );
+    }
+  }
+
   Widget _buildPaymentSelector() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -354,40 +415,40 @@ class _CheckoutPageState extends State<CheckoutPage> {
           const SizedBox(height: 24),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.qr_code_scanner, color: textColor),
+            leading: const Icon(Icons.account_balance, color: textColor),
             title: Text(
-              'QR Code',
+              'Bank Transfer',
               style: GoogleFonts.epilogue(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
                 color: textColor,
               ),
             ),
-            trailing: selectedPaymentMethod == 'QR Code'
+            trailing: selectedPaymentMethod == 'Bank Transfer'
                 ? const Icon(Icons.check_circle, color: primaryColor)
                 : null,
             onTap: () {
-              setState(() => selectedPaymentMethod = 'QR Code');
+              setState(() => selectedPaymentMethod = 'Bank Transfer');
               Navigator.pop(context);
             },
           ),
           const Divider(color: secondaryColor),
           ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.account_balance, color: textColor),
+            leading: const Icon(Icons.payments_outlined, color: textColor),
             title: Text(
-              'Virtual Account',
+              'Cash on Delivery',
               style: GoogleFonts.epilogue(
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
                 color: textColor,
               ),
             ),
-            trailing: selectedPaymentMethod == 'Virtual Account'
+            trailing: selectedPaymentMethod == 'Cash on Delivery'
                 ? const Icon(Icons.check_circle, color: primaryColor)
                 : null,
             onTap: () {
-              setState(() => selectedPaymentMethod = 'Virtual Account');
+              setState(() => selectedPaymentMethod = 'Cash on Delivery');
               Navigator.pop(context);
             },
           ),
@@ -432,7 +493,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('\$15.00', style: GoogleFonts.epilogue(fontWeight: FontWeight.w600, color: textColor)),
+                Text(150000.0.toIDR(), style: GoogleFonts.epilogue(fontWeight: FontWeight.w600, color: textColor)),
                 if (selectedShippingMethod == 'Curated Delivery') ...[
                   const SizedBox(width: 16),
                   const Icon(Icons.check_circle, color: primaryColor),
@@ -442,7 +503,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
             onTap: () {
               setState(() {
                 selectedShippingMethod = 'Curated Delivery';
-                shippingPrice = 15.0;
+                shippingPrice = 150000.0;
+
               });
               Navigator.pop(context);
             },
@@ -463,7 +525,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('\$35.00', style: GoogleFonts.epilogue(fontWeight: FontWeight.w600, color: textColor)),
+                Text(350000.0.toIDR(), style: GoogleFonts.epilogue(fontWeight: FontWeight.w600, color: textColor)),
                 if (selectedShippingMethod == 'Express Shipping') ...[
                   const SizedBox(width: 16),
                   const Icon(Icons.check_circle, color: primaryColor),
@@ -473,7 +535,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
             onTap: () {
               setState(() {
                 selectedShippingMethod = 'Express Shipping';
-                shippingPrice = 35.0;
+                shippingPrice = 350000.0;
+
               });
               Navigator.pop(context);
             },
@@ -591,7 +654,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ),
         ),
         Text(
-          '\$${price.toStringAsFixed(2)}',
+          price.toIDR(),
           style: GoogleFonts.epilogue(
             color: textColor,
             fontWeight: FontWeight.w600,
@@ -634,14 +697,116 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _buildPriceBreakdown(double subtotal, double grandTotal) {
+  Widget _buildVoucherSection(OrderProvider orderProvider, double subtotal) {
+    final hasVoucher = orderProvider.selectedVoucher != null;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'VOUCHER CODE',
+          style: GoogleFonts.epilogue(
+            color: textColor,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: secondaryColor),
+                ),
+                child: TextField(
+                  controller: _voucherController,
+                  enabled: !hasVoucher,
+                  style: GoogleFonts.epilogue(fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Enter code...',
+                    hintStyle: GoogleFonts.epilogue(color: Colors.grey.shade400),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () async {
+                  if (hasVoucher) {
+                    orderProvider.selectVoucher(null);
+                    _voucherController.clear();
+                  } else {
+                    if (_voucherController.text.isEmpty) return;
+                    
+                    // We need a seller ID. Usually in checkout all items are from the same seller
+                    // or we check the first item's seller.
+                    final cartProvider = context.read<CartProvider>();
+                    if (cartProvider.selectedItems.isEmpty) return;
+                    final sellerId = cartProvider.selectedItems.first.product.sellerId;
+
+                    final error = await orderProvider.applyVoucher(
+                      _voucherController.text, 
+                      sellerId, 
+                      subtotal
+                    );
+
+                    if (mounted) {
+                      if (error != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Voucher diterapkan!')));
+                      }
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: hasVoucher ? Colors.red.shade50 : primaryColor,
+                  foregroundColor: hasVoucher ? Colors.red : Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(hasVoucher ? 'REMOVE' : 'APPLY'),
+              ),
+            ),
+          ],
+        ),
+        if (hasVoucher) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Applied: ${orderProvider.selectedVoucher!.name}',
+            style: GoogleFonts.epilogue(
+              color: Colors.green,
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPriceBreakdown(double subtotal, double discount, double grandTotal) {
     return Column(
       children: [
-        _buildPriceRow('Subtotal', '\$${subtotal.toStringAsFixed(2)}'),
+        _buildPriceRow('Subtotal', subtotal.toIDR()),
         const SizedBox(height: 12),
-        _buildPriceRow('Shipping', '\$${shippingPrice.toStringAsFixed(2)}'),
+        if (discount > 0) ...[
+          _buildPriceRow('Discount', '- ${discount.toIDR()}', color: Colors.green),
+          const SizedBox(height: 12),
+        ],
+        _buildPriceRow('Shipping', shippingPrice.toIDR()),
         const SizedBox(height: 12),
-        _buildPriceRow('Taxes', '\$${taxes.toStringAsFixed(2)}'),
+        _buildPriceRow('Taxes', taxes.toIDR()),
+
         const SizedBox(height: 24),
         const Divider(color: secondaryColor, thickness: 1),
         const SizedBox(height: 20),
@@ -657,7 +822,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               ),
             ),
             Text(
-              '\$${grandTotal.toStringAsFixed(2)}',
+              grandTotal.toIDR(),
               style: GoogleFonts.epilogue(
                 color: primaryColor,
                 fontWeight: FontWeight.w700,
@@ -670,7 +835,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _buildPriceRow(String label, String amount) {
+  Widget _buildPriceRow(String label, String amount, {Color? color}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -684,8 +849,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
         Text(
           amount,
           style: GoogleFonts.epilogue(
-            color: lightTextColor,
+            color: color ?? lightTextColor,
             fontSize: 14,
+            fontWeight: color != null ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ],
@@ -699,7 +865,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -724,7 +890,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '\$${grandTotal.toStringAsFixed(2)}',
+                  grandTotal.toIDR(),
                   style: GoogleFonts.epilogue(
                     color: primaryColor,
                     fontWeight: FontWeight.w700,
@@ -734,18 +900,39 @@ class _CheckoutPageState extends State<CheckoutPage> {
               ],
             ),
             ElevatedButton(
-              onPressed: () {
-                if (selectedPaymentMethod == 'QR Code') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => QrPaymentPage(amount: grandTotal),
-                    ),
+              onPressed: () async {
+                if (selectedPaymentMethod == 'Bank Transfer') {
+                  final orderProvider = context.read<OrderProvider>();
+                  
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(child: CircularProgressIndicator(color: primaryColor)),
                   );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Virtual Account payment not implemented yet.')),
+
+                  final order = await orderProvider.placeOrder(
+                    paymentMethod: 'Bank Transfer',
+                    shippingCourier: selectedShippingMethod,
                   );
+
+                  if (mounted) Navigator.pop(context); // Close loading
+
+                  if (order != null && mounted) {
+                    context.read<CartProvider>().fetchCart(); // Refresh cart
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BankTransferPage(amount: grandTotal, orderId: order.id),
+                      ),
+                    );
+                  } else if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(orderProvider.errorMessage ?? 'Failed to place order')),
+                    );
+                  }
+                } else if (selectedPaymentMethod == 'Cash on Delivery') {
+                  // COD logic: Direct place order
+                  _processCOD(context, grandTotal);
                 }
               },
               style: ElevatedButton.styleFrom(

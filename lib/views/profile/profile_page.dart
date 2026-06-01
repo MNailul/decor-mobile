@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -11,13 +13,54 @@ import 'edit_profile_page.dart';
 import 'orders_page.dart';
 import 'returns_page.dart';
 import 'consultation_history_page.dart';
+import 'track_consultation_page.dart';
 import '../wishlist/wishlist_page.dart';
+import '../chat/chat_history_page.dart';
+import 'help_center_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
   static const Color textColor = Color(0xFF1E1E1E);
   static const Color lightTextColor = Color(0xFF757575);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.read<AuthProvider>().isLoggedIn) {
+        context.read<AddressProvider>().loadAddresses();
+      }
+    });
+  }
+
+  Future<void> _pickAndUploadImage(BuildContext context) async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+
+    if (image != null && mounted) {
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.uploadProfilePicture(image.path);
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated successfully!')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload image. Please try again.')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,8 +104,23 @@ class ProfilePage extends StatelessWidget {
               onPressed: () => authProvider.logout(),
             ),
           ),
-          body: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
+          body: RefreshIndicator(
+            onRefresh: () async {
+              await authProvider.refreshProfile();
+              if (mounted) {
+                await context.read<AddressProvider>().loadAddresses();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Profile synchronized with server'),
+                    duration: Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            color: AppColors.primaryColor,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
             child: Column(
               children: [
                 // Header Section
@@ -71,33 +129,49 @@ class ProfilePage extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
                   child: Column(
                     children: [
-                      Stack(
-                        alignment: Alignment.bottomRight,
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.secondaryColor.withOpacity(0.5), 
-                                width: 4
+                      BounceTap(
+                        onTap: () => _pickAndUploadImage(context),
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: AppColors.secondaryColor.withOpacity(0.5), 
+                                  width: 4
+                                ),
+                              ),
+                              child: CircleAvatar(
+                                radius: 50,
+                                backgroundColor: AppColors.secondaryColor,
+                                backgroundImage: (user.profilePicture != null && user.profilePicture!.isNotEmpty)
+                                    ? NetworkImage(user.profilePicture!)
+                                    : const NetworkImage('https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&q=80'),
+                                child: authProvider.isLoading 
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black26,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Center(
+                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                                        ),
+                                      )
+                                    : null,
                               ),
                             ),
-                            child: CircleAvatar(
-                              radius: 50,
-                              backgroundColor: AppColors.secondaryColor,
-                              backgroundImage: NetworkImage(user.profilePicture ?? 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&q=80'),
+                            Container(
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                              ),
+                              padding: const EdgeInsets.all(5),
+                              child: const Icon(Icons.camera_alt, color: Colors.white, size: 12),
                             ),
-                          ),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryColor,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2.5),
-                            ),
-                            padding: const EdgeInsets.all(5),
-                            child: const Icon(Icons.verified, color: Colors.white, size: 12),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(
@@ -141,30 +215,49 @@ class ProfilePage extends StatelessWidget {
                     children: [
                       _buildSectionHeader('QUICK ACTIONS'),
                       const SizedBox(height: 16),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 16,
+                        alignment: WrapAlignment.spaceBetween,
                         children: [
-                          Expanded(
+                          SizedBox(
+                            width: (MediaQuery.of(context).size.width - 48 - 48) / 5,
                             child: _buildQuickActionItem(
                               Icons.inventory_2_outlined, 
                               'Orders',
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const OrdersPage())),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
+                          SizedBox(
+                            width: (MediaQuery.of(context).size.width - 48 - 48) / 5,
+                            child: _buildQuickActionItem(
+                              Icons.track_changes, 
+                              'Track',
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TrackConsultationPage())),
+                            ),
+                          ),
+                          SizedBox(
+                            width: (MediaQuery.of(context).size.width - 48 - 48) / 5,
                             child: _buildQuickActionItem(
                               Icons.event_note_outlined, 
                               'Consults',
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ConsultationHistoryPage())),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
+                          SizedBox(
+                            width: (MediaQuery.of(context).size.width - 48 - 48) / 5,
                             child: _buildQuickActionItem(
                               Icons.favorite_border_outlined, 
                               'Wishlist',
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const WishlistPage())),
+                            ),
+                          ),
+                          SizedBox(
+                            width: (MediaQuery.of(context).size.width - 48 - 48) / 5,
+                            child: _buildQuickActionItem(
+                              Icons.chat_bubble_outline, 
+                              'Chats',
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ChatHistoryPage())),
                             ),
                           ),
                         ],
@@ -241,7 +334,7 @@ class ProfilePage extends StatelessWidget {
                       Consumer<AddressProvider>(
                         builder: (context, addressProvider, child) {
                           final mainAddress = addressProvider.mainAddress;
-                          if (mainAddress != null) {
+                          if (mainAddress != null && mainAddress.id != 'default-1') {
                             return _buildAddressCard(
                               mainAddress.name.toLowerCase() == 'office' ? Icons.business_outlined : Icons.home_outlined,
                               '${mainAddress.name} (Main)',
@@ -249,6 +342,17 @@ class ProfilePage extends StatelessWidget {
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AddressManagementPage())),
                             );
                           }
+                          
+                          // If only default or no address, check user model
+                          if (user.address.isNotEmpty) {
+                            return _buildAddressCard(
+                              Icons.home_outlined,
+                              'Profile Address (Main)',
+                              '${user.address}, ${user.city}',
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const AddressManagementPage())),
+                            );
+                          }
+
                           return _buildAddressCard(
                             Icons.location_on_outlined,
                             'No Address Yet',
@@ -261,11 +365,36 @@ class ProfilePage extends StatelessWidget {
                   ),
                 ),
 
+                const SizedBox(height: 12),
+
+                // Support & Help Section
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader('SUPPORT & HELP'),
+                      const SizedBox(height: 16),
+                      _buildAddressCard(
+                        Icons.help_outline_rounded,
+                        'Help Center',
+                        'Submit complaints and check history',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HelpCenterPage()),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 const SizedBox(height: 100), // Spacing for floating dock
               ],
             ),
           ),
-        );
+        ),
+      );
       },
     );
   }

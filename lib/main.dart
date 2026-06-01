@@ -12,6 +12,11 @@ import 'providers/address_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/consultation_provider.dart';
 import 'providers/wishlist_provider.dart';
+import 'providers/product_provider.dart';
+import 'providers/chat_provider.dart';
+import 'providers/designer_provider.dart';
+import 'providers/support_provider.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +48,10 @@ void main() async {
         ChangeNotifierProvider(create: (_) => OrderProvider()),
         ChangeNotifierProvider(create: (_) => ConsultationProvider()),
         ChangeNotifierProvider(create: (_) => WishlistProvider()),
+        ChangeNotifierProvider(create: (_) => ProductProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => DesignerProvider()),
+        ChangeNotifierProvider(create: (_) => SupportProvider()),
       ],
       child: const MyApp(),
     ),

@@ -1,56 +1,146 @@
 import 'package:flutter/material.dart';
 import '../models/product_model.dart';
+import '../services/api_service.dart';
 
 class CartItem {
+  int? id; // Database ID from Laravel
   final FurnitureProduct product;
   int quantity;
   bool isSelected;
 
-  CartItem({required this.product, this.quantity = 1, this.isSelected = true});
+  CartItem({this.id, required this.product, this.quantity = 1, this.isSelected = true});
 }
 
 class CartProvider extends ChangeNotifier {
+  final ApiService _apiService = ApiService();
   final List<CartItem> _items = [];
+  bool _isLoading = false;
 
   CartProvider() {
-    // Initialize with an empty cart as requested
+    fetchCart();
   }
 
   List<CartItem> get items => _items;
+  bool get isLoading => _isLoading;
   List<CartItem> get selectedItems => _items.where((item) => item.isSelected).toList();
 
-  void addToCart(FurnitureProduct product, {int quantity = 1}) {
-    final existingIndex = _items.indexWhere((item) => item.product.id == product.id);
-    if (existingIndex >= 0) {
-      _items[existingIndex].quantity += quantity;
-    } else {
-      _items.add(CartItem(product: product, quantity: quantity));
-    }
+  Future<void> fetchCart() async {
+    _isLoading = true;
     notifyListeners();
-  }
 
-  void removeFromCart(String productId) {
-    _items.removeWhere((item) => item.product.id == productId);
-    notifyListeners();
-  }
-
-  void incrementQuantity(String productId) {
-    final index = _items.indexWhere((item) => item.product.id == productId);
-    if (index >= 0) {
-      _items[index].quantity++;
-      notifyListeners();
-    }
-  }
-
-  void decrementQuantity(String productId) {
-    final index = _items.indexWhere((item) => item.product.id == productId);
-    if (index >= 0) {
-      if (_items[index].quantity > 1) {
-        _items[index].quantity--;
-      } else {
-        _items.removeAt(index);
+    try {
+      final cartData = await _apiService.fetchCart();
+      _items.clear();
+      if (cartData != null && cartData['cart_items'] != null) {
+        for (var item in cartData['cart_items']) {
+          // Map Laravel response to our model
+          if (item['product'] != null) {
+            final productModel = ProductModel.fromJson(item['product']);
+            _items.add(CartItem(
+              id: item['id'],
+              product: productModel.toFurnitureProduct(),
+              quantity: item['quantity'] ?? 1,
+            ));
+          }
+        }
       }
+    } catch (e) {
+      print("Fetch Cart Error: $e");
+    } finally {
+      _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<void> addToCart(FurnitureProduct product, {int quantity = 1}) async {
+    // Optimistic UI update or just wait for API? Let's do API first for consistency
+    try {
+      final productId = int.tryParse(product.id);
+      if (productId == null) {
+        // Handle dummy products locally if needed, or just print warning
+        print("Warning: Cannot add dummy product with ID ${product.id} to backend cart.");
+        return;
+      }
+      final success = await _apiService.addToCart(productId, quantity);
+      if (success) {
+        await fetchCart(); // Refresh to get the database ID
+      }
+    } catch (e) {
+      print("Add to Cart Error: $e");
+    }
+  }
+
+  Future<void> buyAgain(List<FurnitureProduct> products) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      for (var product in products) {
+        final productId = int.tryParse(product.id);
+        if (productId != null) {
+          await _apiService.addToCart(productId, 1);
+        }
+      }
+      await fetchCart();
+    } catch (e) {
+      print("Buy Again Error: $e");
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeFromCart(String productId) async {
+    final index = _items.indexWhere((item) => item.product.id == productId);
+    if (index >= 0) {
+      final item = _items[index];
+      // Optimistic update
+      _items.removeAt(index);
+      notifyListeners();
+
+      if (item.id != null) {
+        final success = await _apiService.removeFromCart(item.id!);
+        if (!success) {
+          // Re-fetch if API fails to keep sync
+          await fetchCart();
+        }
+      }
+    }
+  }
+
+  Future<void> incrementQuantity(String productId) async {
+    try {
+      final id = int.tryParse(productId);
+      if (id == null) return;
+      final success = await _apiService.addToCart(id, 1);
+      if (success) {
+        await fetchCart();
+      }
+    } catch (e) {
+      print("Increment Error: $e");
+    }
+  }
+
+  Future<void> decrementQuantity(String productId) async {
+    final index = _items.indexWhere((item) => item.product.id == productId);
+    if (index >= 0) {
+      final item = _items[index];
+      if (item.quantity > 1) {
+        // Optimistic update
+        item.quantity--;
+        notifyListeners();
+
+        if (item.id != null) {
+          final success = await _apiService.updateCartQuantity(item.id!, item.quantity);
+          if (!success) {
+            // Revert or re-fetch on failure
+            item.quantity++;
+            notifyListeners();
+            await fetchCart();
+          }
+        }
+      } else {
+        await removeFromCart(productId);
+      }
     }
   }
 
@@ -97,7 +187,8 @@ final List<FurnitureProduct> dummyCatalog = [
   FurnitureProduct(
     id: 'p1',
     name: 'Terra Ambiance Chair',
-    price: 84.00,
+    description: 'The Terra Ambiance Chair is a masterpiece of organic brutalism, balancing architectural precision with unparalleled comfort. Hand-finished walnut meets curated Belgian linen for a timeless presence in any modern living space.',
+    price: 1250000,
     category: 'Chair',
     imagePath: 'https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=400&q=80',
     material: 'Fabric',
@@ -107,7 +198,8 @@ final List<FurnitureProduct> dummyCatalog = [
   FurnitureProduct(
     id: 'p2',
     name: 'Sofa Minimalist Beige',
-    price: 150.00,
+    description: 'Experience ultimate comfort with our Minimalist Beige Sofa. Designed for modern living, this sofa features premium fabric and a sturdy frame, making it the perfect centerpiece for your minimalist home decor.',
+    price: 2500000,
     category: 'Sofa',
     imagePath: 'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=400&q=80',
     material: 'Fabric',
@@ -117,7 +209,8 @@ final List<FurnitureProduct> dummyCatalog = [
   FurnitureProduct(
     id: 'p3',
     name: 'Wooden Oak Table',
-    price: 220.00,
+    description: 'Crafted from solid oak, this table brings the warmth of nature into your dining room. Its classic design and durable finish ensure it will be a gathering place for your family for generations to come.',
+    price: 3750000,
     category: 'Table',
     imagePath: 'https://images.unsplash.com/photo-1577140917170-285929fb55b7?w=400&q=80',
     material: 'Oak',
@@ -127,7 +220,8 @@ final List<FurnitureProduct> dummyCatalog = [
   FurnitureProduct(
     id: 'p4',
     name: 'Lumina Pendant Light',
-    price: 45.00,
+    description: 'Illuminate your space with the Lumina Pendant Light. Its sleek metal design and modern aesthetic provide sophisticated lighting for kitchens, dining areas, or office spaces.',
+    price: 450000,
     category: 'Lighting',
     imagePath: 'https://images.unsplash.com/photo-1565814329452-e1efa11c5b89?w=400&q=80',
     material: 'Metal',
@@ -137,7 +231,8 @@ final List<FurnitureProduct> dummyCatalog = [
   FurnitureProduct(
     id: 'p5',
     name: 'Velvet Accent Chair',
-    price: 110.00,
+    description: 'Add a touch of luxury with the Velvet Accent Chair. The plush velvet upholstery and classic silhouette offer both style and comfort, perfect for a reading nook or as a statement piece.',
+    price: 1850000,
     category: 'Chair',
     imagePath: 'https://images.unsplash.com/photo-1580480055273-228ff5388ef8?w=400&q=80',
     material: 'Fabric',
@@ -147,7 +242,8 @@ final List<FurnitureProduct> dummyCatalog = [
   FurnitureProduct(
     id: 'p6',
     name: 'Cloud Lounge Sofa',
-    price: 340.00,
+    description: 'Sink into the Cloud Lounge Sofa, designed for maximum relaxation. Its deep seats and soft fabric create a cloud-like experience, perfect for cozy movie nights and lazy afternoons.',
+    price: 4200000,
     category: 'Sofa',
     imagePath: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80',
     material: 'Fabric',

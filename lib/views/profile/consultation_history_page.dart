@@ -3,27 +3,32 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/consultation_provider.dart';
 import '../../models/consultation_model.dart';
-import 'consultation_chat_page.dart';
+import 'consultation_workspace_page.dart';
+import 'track_consultation_page.dart';
 
-class ConsultationHistoryPage extends StatelessWidget {
+class ConsultationHistoryPage extends StatefulWidget {
   const ConsultationHistoryPage({super.key});
 
+  @override
+  State<ConsultationHistoryPage> createState() => _ConsultationHistoryPageState();
+}
+
+class _ConsultationHistoryPageState extends State<ConsultationHistoryPage> {
   static const Color primaryColor = Color(0xFFB5733A);
   static const Color textColor = Color(0xFF1E1E1E);
 
-  String formatCurrency(double amount) {
-    if (amount >= 1000000) {
-      return 'Rp ${(amount / 1000000).toStringAsFixed(1).replaceAll('.0', '')}jt';
-    } else if (amount >= 1000) {
-      return 'Rp ${(amount / 1000).toInt()}k';
-    }
-    return 'Rp ${amount.toInt()}';
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ConsultationProvider>().loadConsultations();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFAFAFA),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -44,6 +49,9 @@ class ConsultationHistoryPage extends StatelessWidget {
       ),
       body: Consumer<ConsultationProvider>(
         builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator(color: primaryColor));
+          }
           if (provider.consultations.isEmpty) {
             return _buildEmptyState(context);
           }
@@ -106,163 +114,225 @@ class ConsultationHistoryPage extends StatelessWidget {
 
   Widget _buildConsultationCard(BuildContext context, ConsultationModel consultation) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey.shade100),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 12,
             offset: const Offset(0, 4),
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    consultation.designerImage,
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                  ),
+          // Cover Image Section
+          Stack(
+            children: [
+              Container(
+                height: 140,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        consultation.designerName,
-                        style: GoogleFonts.epilogue(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      Text(
-                        consultation.consultationType,
-                        style: GoogleFonts.epilogue(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                        ),
-                      ),
+                child: consultation.fullCoverImage != null
+                    ? Image.network(
+                        consultation.fullCoverImage!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _buildFallbackCover(),
+                      )
+                    : _buildFallbackCover(),
+              ),
+              Positioned(
+                top: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: consultation.getStatusColor(),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2)),
                     ],
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(consultation.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                   child: Text(
-                    consultation.status.name.toUpperCase(),
+                    consultation.getStatusLabel().toUpperCase(),
                     style: GoogleFonts.epilogue(
-                      color: _getStatusColor(consultation.status),
-                      fontWeight: FontWeight.bold,
-                      fontSize: 10,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 9,
+                      letterSpacing: 1,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.calendar_today_outlined, size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${consultation.date.day}/${consultation.date.month}/${consultation.date.year}',
-                          style: GoogleFonts.epilogue(fontSize: 13, color: Colors.grey.shade700),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.access_time, size: 14, color: Colors.grey.shade500),
-                        const SizedBox(width: 8),
-                        Text(
-                          consultation.time,
-                          style: GoogleFonts.epilogue(fontSize: 13, color: Colors.grey.shade700),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      consultation.isFullPayment ? 'Full Payment' : 'DP (30%) Paid',
-                      style: GoogleFonts.epilogue(fontSize: 11, color: Colors.grey.shade500),
-                    ),
-                    Text(
-                      formatCurrency(consultation.paidAmount),
-                      style: GoogleFonts.epilogue(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: primaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (consultation.status == ConsultationStatus.scheduled)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: OutlinedButton(
-                onPressed: () {
-                  if (consultation.consultationType == 'Chat') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ConsultationChatPage(consultation: consultation),
-                      ),
-                    );
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: primaryColor),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: Text(
-                  consultation.consultationType == 'Chat' ? 'Start Chat' : 'Join Meeting',
-                  style: GoogleFonts.epilogue(color: primaryColor, fontWeight: FontWeight.bold),
                 ),
               ),
+            ],
+          ),
+          
+          // Body Section
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Designer Info
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: consultation.fullDesignerImage != null ? NetworkImage(consultation.fullDesignerImage!) : null,
+                      child: consultation.fullDesignerImage == null ? const Icon(Icons.person, size: 16, color: Colors.white) : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DESIGNER',
+                          style: GoogleFonts.epilogue(fontSize: 9, fontWeight: FontWeight.w900, color: Colors.grey.shade400, letterSpacing: 1),
+                        ),
+                        Text(
+                          consultation.designerName ?? 'Expert Designer',
+                          style: GoogleFonts.epilogue(fontSize: 11, fontWeight: FontWeight.bold, color: textColor),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                
+                // Title & Desc
+                Text(
+                  consultation.title,
+                  style: GoogleFonts.epilogue(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '"${consultation.description}"',
+                  style: GoogleFonts.epilogue(fontSize: 12, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 24),
+                
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ConsultationWorkspacePage(consultation: consultation),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade200),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(
+                          'CHAT',
+                          style: GoogleFonts.epilogue(color: textColor, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TrackConsultationPage(),
+                            ),
+                          );
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade200),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: Text(
+                          'TRACK',
+                          style: GoogleFonts.epilogue(color: textColor, fontWeight: FontWeight.w900, fontSize: 10, letterSpacing: 1),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 
-  Color _getStatusColor(ConsultationStatus status) {
-    switch (status) {
-      case ConsultationStatus.pending: return Colors.orange;
-      case ConsultationStatus.scheduled: return Colors.blue;
-      case ConsultationStatus.completed: return Colors.green;
-      case ConsultationStatus.cancelled: return Colors.red;
-    }
+  Widget _buildFallbackCover() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFB5733A), Color(0xFF8B5123)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Decorative background pattern/icon
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Icon(
+              Icons.chair_outlined,
+              size: 120,
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.architecture,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'DESIGN PROJECT',
+                  style: GoogleFonts.epilogue(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

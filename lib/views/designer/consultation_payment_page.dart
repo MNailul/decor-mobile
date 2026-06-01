@@ -1,11 +1,13 @@
-import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
 import '../../models/consultation_model.dart';
 import '../../providers/consultation_provider.dart';
 import '../profile/consultation_history_page.dart';
+import '../../core/utils/currency_formatter.dart';
 
 class ConsultationPaymentPage extends StatefulWidget {
   final Map<String, dynamic> designer;
@@ -14,6 +16,7 @@ class ConsultationPaymentPage extends StatefulWidget {
   final String time;
   final double totalPrice;
   final String? projectBrief;
+  final int? consultationId;
 
   const ConsultationPaymentPage({
     super.key,
@@ -23,6 +26,7 @@ class ConsultationPaymentPage extends StatefulWidget {
     required this.time,
     required this.totalPrice,
     this.projectBrief,
+    this.consultationId,
   });
 
   @override
@@ -34,53 +38,144 @@ class _ConsultationPaymentPageState extends State<ConsultationPaymentPage> {
   static const Color secondaryColor = Color(0xFFE3DCD6);
   static const Color textColor = Color(0xFF1E1E1E);
   static const Color lightTextColor = Color(0xFF757575);
-  
-  bool isFullPayment = true;
-  String selectedPaymentMethod = 'QR Code';
-  int _timerStart = 900; // 15 minutes
-  Timer? _timer;
 
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
+  File? _proofImage;
+  bool _isUploading = false;
+  final ImagePicker _picker = ImagePicker();
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+  Future<void> _pickProofImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Pilih Sumber Foto',
+                style: GoogleFonts.epilogue(fontWeight: FontWeight.bold, fontSize: 16, color: textColor),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFF5EEE8),
+                  child: Icon(Icons.camera_alt_rounded, color: primaryColor),
+                ),
+                title: Text('Kamera', style: GoogleFonts.epilogue(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Color(0xFFF5EEE8),
+                  child: Icon(Icons.photo_library_rounded, color: primaryColor),
+                ),
+                title: Text('Galeri', style: GoogleFonts.epilogue(fontWeight: FontWeight.w600)),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
 
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timerStart == 0) {
-        timer.cancel();
-      } else {
-        setState(() => _timerStart--);
-      }
-    });
-  }
+    if (source == null) return;
 
-  String _formatTime(int seconds) {
-    int minutes = seconds ~/ 60;
-    int remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
-
-  double get amountToPay => isFullPayment ? widget.totalPrice : widget.totalPrice * 0.3;
-
-  String formatCurrency(double amount) {
-    if (amount >= 1000000) {
-      return 'Rp ${(amount / 1000000).toStringAsFixed(1).replaceAll('.0', '')}jt';
-    } else if (amount >= 1000) {
-      return 'Rp ${(amount / 1000).toInt()}k';
+    final XFile? image = await _picker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1200,
+    );
+    if (image != null && mounted) {
+      setState(() => _proofImage = File(image.path));
     }
-    return 'Rp ${amount.toInt()}';
+  }
+
+  Future<void> _submitProof() async {
+    if (_proofImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Silakan pilih foto bukti pembayaran terlebih dahulu.',
+            style: GoogleFonts.epilogue(),
+          ),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isUploading = true);
+
+    try {
+      final consultationProvider = context.read<ConsultationProvider>();
+      bool success = false;
+
+      if (widget.consultationId != null) {
+        success = await consultationProvider.payConsultation(
+          widget.consultationId!,
+          _proofImage!.path,
+        );
+      } else {
+        // Booking flow: first create consultation, then (future) pay
+        success = await consultationProvider.bookConsultation(
+          designerId: widget.designer['id'],
+          title: '${widget.consultationType} Consultation',
+          description: widget.projectBrief ?? 'No brief provided',
+          budgetRange: widget.totalPrice.toString(),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() => _isUploading = false);
+
+      if (success) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          isDismissible: false,
+          builder: (context) => SuccessBottomSheet(amount: widget.totalPrice),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              consultationProvider.errorMessage ?? 'Gagal mengunggah bukti pembayaran.',
+              style: GoogleFonts.epilogue(),
+            ),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isUploading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}', style: GoogleFonts.epilogue()),
+          backgroundColor: Colors.red.shade700,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool isFinalPayment = widget.consultationType.contains('Project');
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -93,38 +188,38 @@ class _ConsultationPaymentPageState extends State<ConsultationPaymentPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'BOOKING PAYMENT',
+          'KIRIM BUKTI PEMBAYARAN',
           style: GoogleFonts.epilogue(
             color: textColor,
             fontWeight: FontWeight.w700,
-            fontSize: 16,
-            letterSpacing: 1.5,
+            fontSize: 14,
+            letterSpacing: 1.2,
           ),
         ),
       ),
       body: SingleChildScrollView(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Order Summary Card (similar to checkout address/shipping cards)
+            // ─── Summary Card ───
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: secondaryColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'CONSULTATION SUMMARY',
+                      isFinalPayment ? 'PEMBAYARAN PROYEK' : 'CONSULTATION FEE',
                       style: GoogleFonts.epilogue(
                         color: lightTextColor,
                         fontWeight: FontWeight.w600,
-                        fontSize: 12,
+                        fontSize: 11,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -134,31 +229,35 @@ class _ConsultationPaymentPageState extends State<ConsultationPaymentPage> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: Image.network(
-                            widget.designer['image'],
-                            width: 60,
-                            height: 60,
+                            widget.designer['image'] ??
+                                'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?q=80&w=200',
+                            width: 56,
+                            height: 56,
                             fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 56,
+                              height: 56,
+                              color: secondaryColor,
+                              child: const Icon(Icons.person, color: lightTextColor),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                widget.designer['name'],
+                                widget.designer['name'] ?? widget.designer['studio_name'] ?? 'Designer',
                                 style: GoogleFonts.epilogue(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: 15,
                                   color: textColor,
                                 ),
                               ),
                               Text(
                                 '${widget.consultationType} Consultation',
-                                style: GoogleFonts.epilogue(
-                                  color: lightTextColor,
-                                  fontSize: 13,
-                                ),
+                                style: GoogleFonts.epilogue(color: lightTextColor, fontSize: 12),
                               ),
                             ],
                           ),
@@ -169,510 +268,277 @@ class _ConsultationPaymentPageState extends State<ConsultationPaymentPage> {
                       padding: EdgeInsets.symmetric(vertical: 16),
                       child: Divider(color: secondaryColor, thickness: 1),
                     ),
-                    _buildSummaryRow('Date', '${widget.date.day}/${widget.date.month}/${widget.date.year}'),
-                    const SizedBox(height: 8),
-                    _buildSummaryRow('Time', widget.time),
-                    const SizedBox(height: 8),
-                    _buildSummaryRow('Total Price', formatCurrency(widget.totalPrice), isBold: true),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          isFinalPayment ? 'Total Proyek' : 'Consultation Fee',
+                          style: GoogleFonts.epilogue(color: lightTextColor, fontSize: 14),
+                        ),
+                        Text(
+                          widget.totalPrice.toIDR(),
+                          style: GoogleFonts.epilogue(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: primaryColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (!isFinalPayment) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade50,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'Biaya ini adalah komitmen awal. Biaya jasa desain lengkap akan dinegosiasikan bersama desainer.',
+                          style: GoogleFonts.epilogue(
+                            fontSize: 10,
+                            color: Colors.amber.shade900,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
             ),
 
-            // Payment Options (DP vs Full)
+            // ─── Transfer Info ───
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'PAYMENT OPTION',
+                    'INFORMASI TRANSFER',
                     style: GoogleFonts.epilogue(
                       color: textColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
                       letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildOptionCard(
-                          title: 'Full Payment',
-                          subtitle: formatCurrency(widget.totalPrice),
-                          isSelected: isFullPayment,
-                          onTap: () => setState(() => isFullPayment = true),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildOptionCard(
-                          title: 'Down Payment (30%)',
-                          subtitle: formatCurrency(widget.totalPrice * 0.3),
-                          isSelected: !isFullPayment,
-                          onTap: () => setState(() => isFullPayment = false),
-                        ),
-                      ),
-                    ],
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: secondaryColor),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildTransferRow('Bank', 'BCA'),
+                        const SizedBox(height: 12),
+                        _buildTransferRow('No. Rekening', '1234 5678 90'),
+                        const SizedBox(height: 12),
+                        _buildTransferRow('Atas Nama', 'PT Decor Indonesia'),
+                        const SizedBox(height: 12),
+                        _buildTransferRow('Jumlah', widget.totalPrice.toIDR(), isHighlight: true),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // Payment Method Selector
+            // ─── Upload Proof Section ───
             Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'PAYMENT METHOD',
+                    'UPLOAD BUKTI PEMBAYARAN',
                     style: GoogleFonts.epilogue(
                       color: textColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
                       letterSpacing: 0.5,
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Upload screenshot atau foto struk transfer Anda.',
+                    style: GoogleFonts.epilogue(color: lightTextColor, fontSize: 12),
+                  ),
                   const SizedBox(height: 16),
-                  _buildPaymentMethodCard(),
-                ],
-              ),
-            ),
 
-            if (selectedPaymentMethod == 'QR Code') ...[
-              const SizedBox(height: 32),
-              Center(
-                child: Column(
-                  children: [
-                    Text(
-                      'Complete your payment in',
-                      style: GoogleFonts.epilogue(
-                        color: lightTextColor,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _formatTime(_timerStart),
-                      style: GoogleFonts.epilogue(
-                        color: primaryColor,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2.0,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(20),
+                  // Preview / Picker
+                  GestureDetector(
+                    onTap: _pickProofImage,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      height: 220,
+                      width: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: secondaryColor, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+                        color: _proofImage != null ? Colors.transparent : Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _proofImage != null ? primaryColor : secondaryColor,
+                          width: _proofImage != null ? 2 : 1.5,
+                          style: _proofImage != null ? BorderStyle.solid : BorderStyle.solid,
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          Image.network(
-                            'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=DecorAppConsultationPayment',
-                            width: 180,
-                            height: 180,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Scan with any QRIS supported app',
-                            style: GoogleFonts.epilogue(
-                              color: lightTextColor,
-                              fontSize: 12,
+                      clipBehavior: Clip.hardEdge,
+                      child: _proofImage != null
+                          ? Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.file(_proofImage!, fit: BoxFit.cover),
+                                Positioned(
+                                  bottom: 10,
+                                  right: 10,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.6),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.edit, color: Colors.white, size: 14),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'Ganti Foto',
+                                          style: GoogleFonts.epilogue(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5EEE8),
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  child: const Icon(Icons.cloud_upload_rounded, color: primaryColor, size: 30),
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  'Tap untuk upload foto',
+                                  style: GoogleFonts.epilogue(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: textColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'JPG, PNG • Maks. 10 MB',
+                                  style: GoogleFonts.epilogue(fontSize: 11, color: lightTextColor),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     ),
-                    const SizedBox(height: 32),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: _processPayment,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: primaryColor,
-                            side: const BorderSide(color: primaryColor, width: 1.5),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            'I HAVE PAID',
-                            style: GoogleFonts.epilogue(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              // Virtual Account placeholder
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: secondaryColor),
                   ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Virtual Account Number',
-                        style: GoogleFonts.epilogue(
-                          color: lightTextColor,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        '8839 0812 3456 7890',
-                        style: GoogleFonts.epilogue(
-                          color: textColor,
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Bank Mandiri • Decor App',
-                        style: GoogleFonts.epilogue(
-                          color: lightTextColor,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
-            ],
-            
-            const SizedBox(height: 120),
+            ),
+
+            const SizedBox(height: 40),
           ],
         ),
       ),
-      bottomSheet: selectedPaymentMethod == 'Virtual Account' ? Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+
+      // ─── Bottom Submit Bar ───
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 16,
+              offset: const Offset(0, -6),
             ),
           ],
         ),
         child: SafeArea(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'TOTAL PAYMENT',
-                    style: GoogleFonts.epilogue(
-                      color: lightTextColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 11,
-                      letterSpacing: 0.5,
-                    ),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isUploading ? null : _submitProof,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _proofImage != null ? primaryColor : Colors.grey.shade300,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    disabledBackgroundColor: Colors.grey.shade200,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatCurrency(amountToPay),
-                    style: GoogleFonts.epilogue(
-                      color: primaryColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 22,
-                    ),
-                  ),
-                ],
-              ),
-              ElevatedButton(
-                onPressed: _processPayment,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'BAYAR SEKARANG',
-                  style: GoogleFonts.epilogue(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                    letterSpacing: 0.5,
-                  ),
+                  child: _isUploading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.upload_file_rounded, size: 18),
+                            const SizedBox(width: 10),
+                            Text(
+                              'KIRIM BUKTI PEMBAYARAN',
+                              style: GoogleFonts.epilogue(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Pembayaran akan dikonfirmasi setelah desainer memverifikasi bukti Anda.',
+                style: GoogleFonts.epilogue(fontSize: 10, color: lightTextColor),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
             ],
           ),
         ),
-      ) : null,
+      ),
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
+  Widget _buildTransferRow(String label, String value, {bool isHighlight = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.epilogue(
-            color: lightTextColor,
-            fontSize: 14,
-          ),
-        ),
+        Text(label, style: GoogleFonts.epilogue(color: lightTextColor, fontSize: 13)),
         Text(
           value,
           style: GoogleFonts.epilogue(
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
-            fontSize: 14,
-            color: isBold ? primaryColor : textColor,
+            fontWeight: FontWeight.bold,
+            fontSize: isHighlight ? 16 : 13,
+            color: isHighlight ? primaryColor : textColor,
           ),
         ),
       ],
     );
-  }
-
-  Widget _buildOptionCard({
-    required String title,
-    required String subtitle,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? primaryColor.withOpacity(0.05) : Colors.white,
-          border: Border.all(
-            color: isSelected ? primaryColor : secondaryColor,
-            width: isSelected ? 2 : 1,
-          ),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.epilogue(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
-                color: isSelected ? primaryColor : lightTextColor,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: GoogleFonts.epilogue(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-                color: isSelected ? primaryColor : textColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodCard() {
-    bool isQr = selectedPaymentMethod == 'QR Code';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: secondaryColor),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isQr ? Icons.qr_code_scanner : Icons.account_balance,
-            color: textColor,
-            size: 28,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  selectedPaymentMethod,
-                  style: GoogleFonts.epilogue(
-                    color: textColor,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isQr ? 'Scan QR with any app' : 'Virtual Account Number',
-                  style: GoogleFonts.epilogue(
-                    color: lightTextColor,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () {
-              showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (context) => _buildPaymentSelector(),
-              );
-            },
-            child: Text(
-              'CHANGE',
-              style: GoogleFonts.epilogue(
-                color: primaryColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentSelector() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Select Payment Method',
-            style: GoogleFonts.epilogue(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: 24),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.qr_code_scanner, color: textColor),
-            title: Text(
-              'QR Code',
-              style: GoogleFonts.epilogue(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-            ),
-            trailing: selectedPaymentMethod == 'QR Code'
-                ? const Icon(Icons.check_circle, color: primaryColor)
-                : null,
-            onTap: () {
-              setState(() => selectedPaymentMethod = 'QR Code');
-              Navigator.pop(context);
-            },
-          ),
-          const Divider(color: secondaryColor),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.account_balance, color: textColor),
-            title: Text(
-              'Virtual Account',
-              style: GoogleFonts.epilogue(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-            ),
-            trailing: selectedPaymentMethod == 'Virtual Account'
-                ? const Icon(Icons.check_circle, color: primaryColor)
-                : null,
-            onTap: () {
-              setState(() => selectedPaymentMethod = 'Virtual Account');
-              Navigator.pop(context);
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  void _processPayment() {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: primaryColor)),
-    );
-
-    // Simulate payment delay
-    Future.delayed(const Duration(seconds: 1), () {
-      Navigator.pop(context); // Pop loading
-
-      // Save consultation
-      final consultation = ConsultationModel(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        designerName: widget.designer['name'],
-        designerImage: widget.designer['image'],
-        consultationType: widget.consultationType,
-        date: widget.date,
-        time: widget.time,
-        totalPrice: widget.totalPrice,
-        paidAmount: amountToPay,
-        isFullPayment: isFullPayment,
-        status: ConsultationStatus.scheduled,
-        projectBrief: widget.projectBrief,
-      );
-
-      Provider.of<ConsultationProvider>(context, listen: false).addConsultation(consultation);
-
-      // Show success sheet (consistent with checkout)
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => SuccessBottomSheet(amount: amountToPay),
-      );
-    });
   }
 }
 
@@ -695,7 +561,6 @@ class SuccessBottomSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag Handle
           Container(
             width: 40,
             height: 4,
@@ -705,20 +570,14 @@ class SuccessBottomSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 32),
-          // Lottie Success Animation
           SizedBox(
             width: 120,
             height: 120,
-            child: Lottie.asset(
-              'assets/animations/success.json',
-              repeat: false,
-              animate: true,
-            ),
+            child: Lottie.asset('assets/animations/success.json', repeat: false, animate: true),
           ),
           const SizedBox(height: 24),
-          // Title
           Text(
-            'Booking Berhasil!',
+            'Bukti Dikirim!',
             style: GoogleFonts.epilogue(
               color: textColor,
               fontSize: 22,
@@ -727,35 +586,22 @@ class SuccessBottomSheet extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
-          // Subtitle
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: GoogleFonts.epilogue(
-                color: Colors.grey.shade600,
-                fontSize: 14,
-                height: 1.5,
-              ),
-              children: [
-                const TextSpan(text: 'Konsultasi Anda telah dijadwalkan.\nTotal Terbayar: '),
-                TextSpan(
-                  text: 'Rp ${amount >= 1000 ? (amount / 1000).toInt() : amount.toInt()}k',
-                  style: GoogleFonts.epilogue(
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-              ],
+          Text(
+            'Bukti pembayaran sebesar ${amount.toIDR()} telah terkirim.\nMenunggu verifikasi dari desainer.',
+            style: GoogleFonts.epilogue(
+              color: Colors.grey.shade600,
+              fontSize: 13,
+              height: 1.6,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
-          // Action Buttons
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pop(context); // Close sheet
+                Navigator.pop(context);
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => const ConsultationHistoryPage()),
@@ -765,41 +611,31 @@ class SuccessBottomSheet extends StatelessWidget {
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: Text(
                 'Lihat Status Konsultasi',
-                style: GoogleFonts.epilogue(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
+                style: GoogleFonts.epilogue(fontWeight: FontWeight.w600, fontSize: 15),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             height: 50,
             child: OutlinedButton(
               onPressed: () {
-                Navigator.pop(context); // Close sheet
+                Navigator.pop(context);
                 Navigator.popUntil(context, (route) => route.isFirst);
               },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: primaryColor),
                 foregroundColor: primaryColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: Text(
                 'Kembali ke Beranda',
-                style: GoogleFonts.epilogue(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
+                style: GoogleFonts.epilogue(fontWeight: FontWeight.w600, fontSize: 15),
               ),
             ),
           ),

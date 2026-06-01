@@ -4,6 +4,10 @@ import '../product/product_detail_page.dart';
 import '../../models/product_model.dart';
 import '../../providers/cart_provider.dart';
 import '../../widgets/bounce_tap.dart';
+import 'package:provider/provider.dart';
+import '../../providers/product_provider.dart';
+import '../../core/utils/currency_formatter.dart';
+
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -68,9 +72,13 @@ class _SearchPageState extends State<SearchPage> {
                               setState(() {
                                 _searchQuery = value;
                                 if (value.isNotEmpty) {
-                                  _searchResults = dummyCatalog.where((product) => 
+                                  final allProducts = context.read<ProductProvider>().products;
+                                  final furnitureProducts = allProducts.map((p) => p.toFurnitureProduct()).toList();
+                                  
+                                  _searchResults = furnitureProducts.where((product) => 
                                     product.name.toLowerCase().contains(value.toLowerCase()) || 
-                                    product.category.toLowerCase().contains(value.toLowerCase())
+                                    product.category.toLowerCase().contains(value.toLowerCase()) ||
+                                    product.shopName.toLowerCase().contains(value.toLowerCase())
                                   ).toList();
                                 } else {
                                   _searchResults = [];
@@ -117,20 +125,29 @@ class _SearchPageState extends State<SearchPage> {
                           const Text('Trending Now', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 16),
                           
-                          // Trending Products Grid
-                          GridView.count(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 0.75,
-                            children: [
-                              _buildTrendingProduct('The Plinth Cushion', '\$115', 'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=400&q=80'),
-                              _buildTrendingProduct('Orbital Tray', '\$89', 'https://images.unsplash.com/photo-1616486029423-aaa4789e8c9a?w=400&q=80'),
-                              _buildTrendingProduct('Lounge Chair', '\$450', 'https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=400&q=80'),
-                              _buildTrendingProduct('Ceramic Vase', '\$65', 'https://images.unsplash.com/photo-1612152505975-6454ce466c6d?w=400&q=80'),
-                            ],
+                          // Trending Products Grid from API
+                          Consumer<ProductProvider>(
+                            builder: (context, provider, child) {
+                              final trendingProducts = provider.products.take(4).toList();
+                              if (trendingProducts.isEmpty) {
+                                return const Center(child: Text('No trending products yet', style: TextStyle(color: Colors.grey, fontSize: 12)));
+                              }
+                              return GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  childAspectRatio: 0.75,
+                                ),
+                                itemCount: trendingProducts.length,
+                                itemBuilder: (context, index) {
+                                  final product = trendingProducts[index].toFurnitureProduct();
+                                  return _buildSearchProductCard(product);
+                                },
+                              );
+                            },
                           ),
                           const SizedBox(height: 32),
                         ],
@@ -219,9 +236,16 @@ class _SearchPageState extends State<SearchPage> {
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(12),
-                image: DecorationImage(
-                  image: NetworkImage(product.imagePath),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  product.imagePath,
                   fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: Colors.grey.shade100,
+                    child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey, size: 20),
+                  ),
                 ),
               ),
             ),
@@ -229,7 +253,7 @@ class _SearchPageState extends State<SearchPage> {
           const SizedBox(height: 12),
           Text(product.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
-          Text('\$${product.price.toStringAsFixed(2)}', style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.bold, fontSize: 13)),
+          Text(product.price.toIDR(), style: const TextStyle(color: AppColors.primaryColor, fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
     );

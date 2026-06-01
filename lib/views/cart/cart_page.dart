@@ -7,6 +7,8 @@ import '../../providers/cart_provider.dart';
 import '../profile/guest_profile_page.dart';
 import '../home/home_page.dart';
 import 'checkout_page.dart';
+import '../../core/utils/currency_formatter.dart';
+
 
 class CartPage extends StatelessWidget {
   const CartPage({super.key});
@@ -106,7 +108,7 @@ class CartPage extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, -5),
           ),
@@ -131,7 +133,7 @@ class CartPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '\$${cartProvider.totalAmount.toStringAsFixed(2)}',
+                  cartProvider.totalAmount.toIDR(),
                   style: GoogleFonts.epilogue(
                     color: primaryColor,
                     fontWeight: FontWeight.w700,
@@ -325,7 +327,7 @@ class CartPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '\$${item.product.price.toStringAsFixed(2)}',
+                      item.product.price.toIDR(),
                       style: GoogleFonts.epilogue(
                         color: textColor,
                         fontWeight: FontWeight.w600,

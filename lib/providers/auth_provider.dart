@@ -23,11 +23,23 @@ class AuthProvider extends ChangeNotifier {
     return user != null;
   }
 
-  Future<bool> register(String fullName, String email, String password, String phone) async {
+  Future<bool> register({
+    required String username,
+    required String fullName,
+    required String email,
+    required String password,
+    required String confirmPassword,
+  }) async {
     _isLoading = true;
     notifyListeners();
 
-    final user = await _authService.register(fullName, email, password, phone);
+    final user = await _authService.register(
+      username: username,
+      fullName: fullName,
+      email: email,
+      password: password,
+      confirmPassword: confirmPassword,
+    );
     _currentUser = user;
     
     _isLoading = false;
@@ -44,6 +56,8 @@ class AuthProvider extends ChangeNotifier {
     String? fullName,
     String? email,
     String? phone,
+    String? address,
+    String? city,
     String? profilePicture,
   }) async {
     if (_currentUser != null) {
@@ -51,10 +65,43 @@ class AuthProvider extends ChangeNotifier {
         fullName: fullName,
         email: email,
         phone: phone,
+        address: address,
+        city: city,
         profilePicture: profilePicture,
       );
       await _authService.updateUser(_currentUser!);
       notifyListeners();
     }
+  }
+
+  Future<bool> uploadProfilePicture(String filePath) async {
+    _isLoading = true;
+    notifyListeners();
+
+    final imageUrl = await _authService.uploadProfilePicture(filePath);
+    
+    if (imageUrl != null && _currentUser != null) {
+      _currentUser = _currentUser!.copyWith(profilePicture: imageUrl);
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    }
+
+    _isLoading = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<void> refreshProfile() async {
+    _isLoading = true;
+    notifyListeners();
+
+    final user = await _authService.getProfile();
+    if (user != null) {
+      _currentUser = user;
+    }
+
+    _isLoading = false;
+    notifyListeners();
   }
 }

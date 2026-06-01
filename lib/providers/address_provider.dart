@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/address_model.dart';
+import '../services/api_service.dart';
 
 class AddressProvider extends ChangeNotifier {
-  final List<AddressModel> _addresses = [
-    AddressModel(
-      id: 'default-1',
-      name: 'Home',
-      recipientName: 'Jane Doe',
-      phoneNumber: '+1 (555) 123-4567',
-      fullAddress: '123 Minimalist Avenue, Suite 4B\nNew York, NY 10001',
-      isMain: true,
-    ),
-  ];
+  final ApiService _apiService = ApiService();
+  List<AddressModel> _addresses = [];
+  bool _isLoading = false;
 
   List<AddressModel> get addresses => _addresses;
+  bool get isLoading => _isLoading;
 
   AddressModel? get mainAddress {
     try {
@@ -23,51 +18,102 @@ class AddressProvider extends ChangeNotifier {
     }
   }
 
-  void addAddress(AddressModel address) {
-    if (address.isMain || _addresses.isEmpty) {
-      _setAllNotMain();
-      address.isMain = true;
-    }
-    _addresses.add(address);
+  Future<void> loadAddresses() async {
+    _isLoading = true;
     notifyListeners();
-  }
 
-  void updateAddress(AddressModel address) {
-    final index = _addresses.indexWhere((a) => a.id == address.id);
-    if (index != -1) {
-      if (address.isMain) {
-        _setAllNotMain();
-      }
-      _addresses[index] = address;
-      // If we accidentally set the only address to not main, fix it
-      if (_addresses.where((a) => a.isMain).isEmpty && _addresses.isNotEmpty) {
-        _addresses.first.isMain = true;
-      }
+    try {
+      final data = await _apiService.fetchAddresses();
+      _addresses = data.map((json) => AddressModel.fromJson(json)).toList();
+    } catch (e) {
+      print("Load Addresses Error: $e");
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  void deleteAddress(String id) {
-    final address = _addresses.firstWhere((a) => a.id == id);
-    _addresses.removeWhere((a) => a.id == id);
-    if (address.isMain && _addresses.isNotEmpty) {
-      _addresses.first.isMain = true;
-    }
+  Future<bool> addAddress(AddressModel address) async {
+    _isLoading = true;
     notifyListeners();
+
+    try {
+      final data = await _apiService.createAddress(address.toJson());
+      if (data != null) {
+        final newAddress = AddressModel.fromJson(data);
+        _addresses.add(newAddress);
+        if (newAddress.isMain) {
+          _setAllNotMainExcept(newAddress.id);
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("Add Address Error: $e");
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  void setMainAddress(String id) {
-    _setAllNotMain();
+  Future<bool> updateAddress(AddressModel address) async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final data = await _apiService.updateAddress(address.id, address.toJson());
+      if (data != null) {
+        final updatedAddress = AddressModel.fromJson(data);
+        final index = _addresses.indexWhere((a) => a.id == updatedAddress.id);
+        if (index != -1) {
+          _addresses[index] = updatedAddress;
+          if (updatedAddress.isMain) {
+            _setAllNotMainExcept(updatedAddress.id);
+          }
+        }
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("Update Address Error: $e");
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteAddress(String id) async {
+    try {
+      final success = await _apiService.deleteAddress(id);
+      if (success) {
+        _addresses.removeWhere((a) => a.id == id);
+        notifyListeners();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("Delete Address Error: $e");
+      return false;
+    }
+  }
+
+  Future<void> setMainAddress(String id) async {
     final index = _addresses.indexWhere((a) => a.id == id);
     if (index != -1) {
-      _addresses[index].isMain = true;
+      final address = _addresses[index].copyWith(isMain: true);
+      await updateAddress(address);
     }
-    notifyListeners();
   }
 
-  void _setAllNotMain() {
+  void _setAllNotMainExcept(String id) {
     for (var addr in _addresses) {
-      addr.isMain = false;
+      if (addr.id != id) {
+        addr.isMain = false;
+      }
     }
   }
 }

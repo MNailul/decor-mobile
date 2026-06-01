@@ -1,17 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../models/order_model.dart';
+import '../../providers/order_provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../widgets/bounce_tap.dart';
 import 'return_request_page.dart';
 import '../chat/chat_detail_page.dart';
+import '../../core/utils/currency_formatter.dart';
+import 'invoice_page.dart';
 
-class OrderDetailsPage extends StatelessWidget {
+class OrderDetailsPage extends StatefulWidget {
   final OrderModel order;
 
   const OrderDetailsPage({super.key, required this.order});
 
+  @override
+  State<OrderDetailsPage> createState() => _OrderDetailsPageState();
+}
+
+class _OrderDetailsPageState extends State<OrderDetailsPage> {
   static const Color primaryColor = Color(0xFFB5733A);
   static const Color secondaryColor = Color(0xFFE3DCD6);
   static const Color statusGreen = Color(0xFF4CAF50);
@@ -20,125 +29,145 @@ class OrderDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isReturnState = order.status == OrderStatus.returning;
-    final dateStr = DateFormat('MMM dd, yyyy').format(order.orderDate);
+    return Consumer<OrderProvider>(
+      builder: (context, provider, child) {
+        // Cari order terbaru dari provider
+        final currentOrder = provider.orders.firstWhere(
+          (o) => o.id == widget.order.id,
+          orElse: () => widget.order,
+        );
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Order Details',
-          style: GoogleFonts.epilogue(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline, color: primaryColor),
-            onPressed: () {
-              final shopName = order.items.isNotEmpty 
-                  ? order.items.first.product.shopName 
-                  : 'Decor Official Store';
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName)),
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Order Summary Header
-            _buildOrderSummaryHeader(context),
-            const SizedBox(height: 32),
+        final bool isReturnState = currentOrder.status == OrderStatus.returning;
 
-            // Product Items List
-            _buildProductList(),
-            const SizedBox(height: 40),
-
-            // Dynamic Vertical Tracking Timeline
-            Text(
-              isReturnState ? 'RETURN STATUS' : 'DELIVERY STATUS',
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: Text(
+              'Order Details',
               style: GoogleFonts.epilogue(
-                fontSize: 12,
+                color: Colors.black,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey.shade500,
-                letterSpacing: 1.5,
+                fontSize: 18,
               ),
             ),
-            const SizedBox(height: 24),
-            _buildTrackingTimeline(isReturnState),
-
-            const SizedBox(height: 40),
-
-            // Payment Summary
-            _buildPaymentSummary(),
-            const SizedBox(height: 32),
-
-            // ADD CHAT SELLER BUTTON HERE TOO
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline, color: primaryColor),
                 onPressed: () {
-                  final shopName = order.items.isNotEmpty 
-                      ? order.items.first.product.shopName 
+                  final shopName = currentOrder.items.isNotEmpty 
+                      ? (currentOrder.items.first.product?.shopName ?? 'Decor Official Store') 
                       : 'Decor Official Store';
+                  final receiverId = currentOrder.items.isNotEmpty
+                      ? (currentOrder.items.first.product?.sellerUserId ?? 0)
+                      : 0;
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName)),
+                    MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName, receiverId: receiverId)),
                   );
                 },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: primaryColor,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: primaryColor, width: 1.5),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+          body: RefreshIndicator(
+            onRefresh: () => provider.refreshOrder(currentOrder.id),
+            color: primaryColor,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Order Summary Header
+                  _buildOrderSummaryHeader(context, currentOrder),
+                  const SizedBox(height: 32),
+
+                  // Product Items List
+                  _buildProductList(currentOrder),
+                  const SizedBox(height: 40),
+
+                  // Dynamic Vertical Tracking Timeline
+                  Text(
+                    isReturnState ? 'RETURN STATUS' : 'DELIVERY STATUS',
+                    style: GoogleFonts.epilogue(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade500,
+                      letterSpacing: 1.5,
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.chat_bubble_outline, size: 20),
-                    const SizedBox(width: 12),
-                    Text(
-                      'NEED HELP? CHAT SELLER',
-                      style: GoogleFonts.epilogue(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                        fontSize: 13,
+                  const SizedBox(height: 24),
+                  _buildTrackingTimeline(isReturnState, currentOrder),
+
+                  const SizedBox(height: 40),
+
+                  // Payment Summary
+                  _buildPaymentSummary(currentOrder),
+                  const SizedBox(height: 32),
+
+                  // ADD CHAT SELLER BUTTON HERE TOO
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final shopName = currentOrder.items.isNotEmpty 
+                            ? (currentOrder.items.first.product?.shopName ?? 'Decor Official Store') 
+                            : 'Decor Official Store';
+                        final receiverId = currentOrder.items.isNotEmpty
+                            ? (currentOrder.items.first.product?.sellerUserId ?? 0)
+                            : 0;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => ChatDetailPage(shopName: shopName, receiverId: receiverId)),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: primaryColor,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: primaryColor, width: 1.5),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.chat_bubble_outline, size: 20),
+                          const SizedBox(width: 12),
+                          Text(
+                            'NEED HELP? CHAT SELLER',
+                            style: GoogleFonts.epilogue(
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 48),
+                ],
               ),
             ),
-            const SizedBox(height: 48),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildBottomActionBar(context),
+          ),
+          bottomNavigationBar: _buildBottomActionBar(context, currentOrder),
+        );
+      },
     );
   }
 
-  Widget _buildOrderSummaryHeader(BuildContext context) {
+  Widget _buildOrderSummaryHeader(BuildContext context, OrderModel order) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,7 +177,7 @@ class OrderDetailsPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Order ID: ${order.id}',
+                'Order ID: #${order.id}',
                 style: GoogleFonts.epilogue(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -168,16 +197,24 @@ class OrderDetailsPage extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        _buildStatusBadge(),
+        _buildStatusBadge(order),
       ],
     );
   }
 
-  Widget _buildStatusBadge() {
+  Widget _buildStatusBadge(OrderModel order) {
     Color bgColor;
     String label;
 
     switch (order.status) {
+      case OrderStatus.processing:
+        bgColor = primaryColor;
+        label = 'Processing';
+        break;
+      case OrderStatus.shipped:
+        bgColor = statusOrange;
+        label = 'On the way';
+        break;
       case OrderStatus.delivered:
         bgColor = statusGreen;
         label = 'Delivered';
@@ -192,7 +229,7 @@ class OrderDetailsPage extends StatelessWidget {
         break;
       default:
         bgColor = primaryColor;
-        label = order.status.name.toUpperCase();
+        label = 'PENDING';
     }
 
     return Container(
@@ -212,7 +249,7 @@ class OrderDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildProductList() {
+  Widget _buildProductList(OrderModel order) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -227,7 +264,7 @@ class OrderDetailsPage extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
-                  item.product.imagePath,
+                  item.product?.imageUrl ?? 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200&q=80',
                   width: 60,
                   height: 60,
                   fit: BoxFit.cover,
@@ -239,7 +276,7 @@ class OrderDetailsPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.product.name,
+                      item.product?.name ?? 'Unknown Product',
                       style: GoogleFonts.epilogue(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -258,7 +295,7 @@ class OrderDetailsPage extends StatelessWidget {
                 ),
               ),
               Text(
-                '\$${(item.product.price * item.quantity).toStringAsFixed(2)}',
+                (item.price * item.quantity).toIDR(),
                 style: GoogleFonts.epilogue(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -272,11 +309,11 @@ class OrderDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildTrackingTimeline(bool isReturn) {
+  Widget _buildTrackingTimeline(bool isReturn, OrderModel order) {
     if (isReturn) {
       return Column(
         children: [
-          _buildTimelineStep('Return Requested', 'Submitted on ${DateFormat('MMM dd').format(DateTime.now())}', isCompleted: true),
+          _buildTimelineStep('Return Requested', 'Submitted on ${DateFormat('MMM dd').format(order.orderDate)}', isCompleted: true),
           _buildTimelineStep('Awaiting Seller Approval', 'Seller is checking item condition', isCurrent: true),
           _buildTimelineStep('Item Shipped Back', 'Pending approval', isUpcoming: true),
           _buildTimelineStep('Refund Issued', 'Final step', isUpcoming: true, isLast: true),
@@ -287,12 +324,12 @@ class OrderDetailsPage extends StatelessWidget {
         children: [
           _buildTimelineStep('Ordered', 'We have received your order', isCompleted: true),
           _buildTimelineStep('Processing', 'Your items are being prepared', 
-              isCompleted: order.status != OrderStatus.ordered, 
-              isCurrent: order.status == OrderStatus.ordered),
+              isCompleted: order.status != OrderStatus.processing && order.status != OrderStatus.cancelled, 
+              isCurrent: order.status == OrderStatus.processing),
           _buildTimelineStep('Shipped', 'Your order is on the way', 
               isCompleted: order.status == OrderStatus.delivered,
               isCurrent: order.status == OrderStatus.shipped,
-              isUpcoming: order.status == OrderStatus.ordered || order.status == OrderStatus.processing),
+              isUpcoming: order.status == OrderStatus.processing),
           _buildTimelineStep('Delivered', 'Order reached its destination', 
               isCurrent: order.status == OrderStatus.delivered,
               isUpcoming: order.status != OrderStatus.delivered,
@@ -359,8 +396,12 @@ class OrderDetailsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentSummary() {
-    final subtotal = order.totalAmount - 25.0; // Mock breakdown
+  Widget _buildPaymentSummary(OrderModel order) {
+    // Calculate original subtotal from items
+    final double itemsSubtotal = order.items.fold(0, (sum, item) => sum + (item.price * item.quantity));
+    final double shipping = 300000.0; // Mock breakdown based on current UI
+    final double taxes = 75000.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -374,18 +415,44 @@ class OrderDetailsPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        _buildPriceRow('Subtotal', '\$${subtotal.toStringAsFixed(2)}'),
+        _buildPriceRow('Subtotal', itemsSubtotal.toIDR()),
+        if (order.discountAmount > 0) ...[
+          const SizedBox(height: 12),
+          _buildPriceRow('Voucher Discount', '- ${order.discountAmount.toIDR()}', valueColor: Colors.green),
+        ],
         const SizedBox(height: 12),
-        _buildPriceRow('Shipping', '\$20.00'),
+        _buildPriceRow('Shipping', shipping.toIDR()),
         const SizedBox(height: 12),
-        _buildPriceRow('Taxes', '\$5.00'),
+        _buildPriceRow('Taxes', taxes.toIDR()),
         const Divider(height: 32),
-        _buildPriceRow('Grand Total', '\$${order.totalAmount.toStringAsFixed(2)}', isBold: true),
+        _buildPriceRow('Grand Total', order.totalAmount.toIDR(), isBold: true),
+        const SizedBox(height: 24),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context, // Using context is safe here because it's a stateless build section
+                MaterialPageRoute(
+                  builder: (context) => InvoicePage(order: order),
+                ),
+              );
+            },
+            icon: const Icon(Icons.receipt_long, size: 18),
+            label: const Text('VIEW INVOICE'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: primaryColor,
+              side: const BorderSide(color: primaryColor),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildPriceRow(String label, String value, {bool isBold = false}) {
+  Widget _buildPriceRow(String label, String value, {bool isBold = false, Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -402,14 +469,14 @@ class OrderDetailsPage extends StatelessWidget {
           style: GoogleFonts.epilogue(
             fontSize: 14,
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: isBold ? primaryColor : Colors.black87,
+            color: valueColor ?? (isBold ? primaryColor : Colors.black87),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildBottomActionBar(BuildContext context) {
+  Widget _buildBottomActionBar(BuildContext context, OrderModel order) {
     // Check if within 7-day window
     final bool canReturn = order.status == OrderStatus.delivered && 
         DateTime.now().difference(order.orderDate).inDays <= 7;

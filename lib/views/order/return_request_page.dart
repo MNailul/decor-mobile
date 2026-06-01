@@ -10,7 +10,7 @@ import '../../core/theme/app_colors.dart';
 import '../../widgets/bounce_tap.dart';
 
 class ReturnRequestPage extends StatefulWidget {
-  final FurnitureProduct product;
+  final ProductModel? product;
   final String orderId;
 
   const ReturnRequestPage({
@@ -29,8 +29,12 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
   final Color backgroundColor = const Color(0xFFFAFAFA);
   
   String? selectedReason;
+  String selectedReturnType = 'refund'; // default
   final TextEditingController _descriptionController = TextEditingController();
-  final List<XFile> _images = [];
+  final TextEditingController _bankController = TextEditingController();
+  
+  XFile? _photo;
+  XFile? _video;
   final ImagePicker _picker = ImagePicker();
 
   final List<String> reasons = [
@@ -40,16 +44,29 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
     'Salah Kirim Barang',
   ];
 
-  Future<void> _pickImage() async {
+  Future<void> _pickPhoto() async {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
         setState(() {
-          _images.add(image);
+          _photo = image;
         });
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
+      if (video != null) {
+        setState(() {
+          _video = video;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking video: $e');
     }
   }
 
@@ -84,6 +101,18 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
             _buildProductInfoCard(),
             const SizedBox(height: 32),
 
+            // 1.5 Return Type
+            _buildSectionTitle('Tipe Pengembalian'),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: _buildReturnTypeCard('refund', 'Refund (Dana Kembali)', Icons.account_balance_wallet_rounded)),
+                const SizedBox(width: 12),
+                Expanded(child: _buildReturnTypeCard('exchange', 'Tukar Barang', Icons.swap_horiz_rounded)),
+              ],
+            ),
+            const SizedBox(height: 32),
+
             // 2. Reason for Return
             _buildSectionTitle('Alasan Pengembalian'),
             const SizedBox(height: 16),
@@ -100,29 +129,145 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
             _buildDescriptionField(),
             const SizedBox(height: 32),
 
+            if (selectedReturnType == 'refund') ...[
+              _buildSectionTitle('Nomor Rekening Bank'),
+              const SizedBox(height: 16),
+              _buildBankField(),
+              const SizedBox(height: 32),
+            ],
+
             // 4. Upload Proof
-            _buildSectionTitle('Unggah Bukti Foto/Video'),
+            _buildSectionTitle('Unggah Bukti (Wajib)'),
             Text(
-              'Mohon unggah foto kerusakan agar seller dapat memproses retur.',
+              'Mohon unggah foto dan video unboxing/kerusakan.',
               style: GoogleFonts.epilogue(
                 fontSize: 12,
                 color: Colors.grey.shade600,
               ),
             ),
             const SizedBox(height: 16),
-            _buildUploadContainer(),
-            const SizedBox(height: 32),
+            Row(
+              children: [
+                Expanded(child: _buildUploadBox(
+                  title: 'Foto Bukti',
+                  file: _photo,
+                  onTap: _pickPhoto,
+                  icon: Icons.camera_alt_rounded,
+                  isImage: true,
+                )),
+                const SizedBox(width: 16),
+                Expanded(child: _buildUploadBox(
+                  title: 'Video Bukti',
+                  file: _video,
+                  onTap: _pickVideo,
+                  icon: Icons.videocam_rounded,
+                  isImage: false,
+                )),
+              ],
+            ),
             
-            if (_images.isNotEmpty) ...[
-              _buildImageGrid(),
-              const SizedBox(height: 32),
-            ],
-            
-            const SizedBox(height: 80), // Space for bottom button
+            const SizedBox(height: 100), // Space for bottom button
           ],
         ),
       ),
       bottomNavigationBar: _buildBottomButton(),
+    );
+  }
+
+  Widget _buildReturnTypeCard(String type, String label, IconData icon) {
+    final isSelected = selectedReturnType == type;
+    return BounceTap(
+      onTap: () => setState(() => selectedReturnType = type),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? primaryColor.withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? primaryColor : secondaryColor,
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: isSelected ? primaryColor : Colors.grey, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.epilogue(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? primaryColor : Colors.black54,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUploadBox({
+    required String title,
+    required XFile? file,
+    required VoidCallback onTap,
+    required IconData icon,
+    required bool isImage,
+  }) {
+    return BounceTap(
+      onTap: onTap,
+      child: Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: secondaryColor),
+        ),
+        child: file != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: isImage
+                        ? Image.file(File(file.path), fit: BoxFit.cover)
+                        : Container(
+                            color: Colors.black87,
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.play_circle_fill, color: Colors.white, size: 40),
+                                SizedBox(height: 4),
+                                Text('Video Ready', style: TextStyle(color: Colors.white, fontSize: 10)),
+                              ],
+                            ),
+                          ),
+                  ),
+                  Positioned(
+                    top: 5,
+                    right: 5,
+                    child: GestureDetector(
+                      onTap: () => setState(() {
+                        if (isImage) _photo = null; else _video = null;
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                        child: const Icon(Icons.close, color: Colors.white, size: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: primaryColor, size: 30),
+                  const SizedBox(height: 8),
+                  Text(title, style: GoogleFonts.epilogue(fontSize: 12, color: Colors.grey.shade600)),
+                ],
+              ),
+      ),
     );
   }
 
@@ -157,7 +302,7 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.network(
-              widget.product.imagePath,
+              widget.product?.imageUrl ?? 'https://via.placeholder.com/200',
               width: 80,
               height: 80,
               fit: BoxFit.cover,
@@ -169,7 +314,7 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.product.name,
+                  widget.product?.name ?? 'Unknown Product',
                   style: GoogleFonts.epilogue(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -178,7 +323,7 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Order ID: ${widget.orderId}',
+                  'Order ID: #${widget.orderId}',
                   style: GoogleFonts.epilogue(
                     fontSize: 12,
                     color: Colors.grey.shade500,
@@ -224,98 +369,33 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
   Widget _buildDescriptionField() {
     return TextFormField(
       controller: _descriptionController,
-      maxLines: 5,
+      maxLines: 4,
       style: GoogleFonts.epilogue(fontSize: 14),
       decoration: InputDecoration(
-        hintText: 'Ceritakan secara detail kerusakan atau masalah pada barang...',
+        hintText: 'Ceritakan detail kerusakan...',
         hintStyle: GoogleFonts.epilogue(color: Colors.grey.shade400, fontSize: 14),
         filled: true,
-        fillColor: secondaryColor.withOpacity(0.3),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
+        fillColor: Colors.white,
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: secondaryColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: primaryColor)),
         contentPadding: const EdgeInsets.all(20),
       ),
     );
   }
 
-  Widget _buildUploadContainer() {
-    return BounceTap(
-      onTap: _pickImage,
-      child: CustomPaint(
-        painter: DashPainter(color: primaryColor),
-        child: Container(
-          width: double.infinity,
-          height: 120,
-          decoration: BoxDecoration(
-            color: secondaryColor.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.camera_alt_rounded, color: primaryColor, size: 32),
-              const SizedBox(height: 8),
-              Text(
-                'Tap untuk unggah gambar',
-                style: GoogleFonts.epilogue(
-                  color: primaryColor,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _buildBankField() {
+    return TextFormField(
+      controller: _bankController,
+      style: GoogleFonts.epilogue(fontSize: 14),
+      decoration: InputDecoration(
+        hintText: 'Contoh: BCA 1234567890 a/n Nama',
+        hintStyle: GoogleFonts.epilogue(color: Colors.grey.shade400, fontSize: 14),
+        filled: true,
+        fillColor: Colors.white,
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: secondaryColor)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: primaryColor)),
+        contentPadding: const EdgeInsets.all(20),
       ),
-    );
-  }
-
-  Widget _buildImageGrid() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: _images.length,
-      itemBuilder: (context, index) {
-        return Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(
-                File(_images[index].path),
-                width: double.infinity,
-                height: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _images.removeAt(index);
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(
-                    color: Colors.black54,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close, color: Colors.white, size: 12),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 
@@ -325,57 +405,79 @@ class _ReturnRequestPageState extends State<ReturnRequestPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -4),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, -4)),
         ],
       ),
       child: SafeArea(
         child: BounceTap(
-          onTap: () {
+          onTap: () async {
             if (selectedReason == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Pilih alasan pengembalian terlebih dahulu')),
-              );
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pilih alasan retur')));
               return;
             }
-            // Logic to submit
-            context.read<OrderProvider>().updateOrderStatus(widget.orderId, OrderStatus.returning);
+            if (_photo == null || _video == null) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unggah foto dan video bukti')));
+              return;
+            }
+            if (selectedReturnType == 'refund' && _bankController.text.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Masukkan nomor rekening')));
+              return;
+            }
+
+            final provider = context.read<OrderProvider>();
             
             showDialog(
               context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Berhasil'),
-                content: const Text('Pengajuan retur Anda telah terkirim.'),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pop(context);
-                    },
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
+              barrierDismissible: false,
+              builder: (context) => const Center(child: CircularProgressIndicator(color: Color(0xFFB5733A))),
             );
+
+            final success = await provider.submitReturn(
+              orderId: widget.orderId,
+              reason: '$selectedReason - ${_descriptionController.text}',
+              returnType: selectedReturnType,
+              bankAccountNumber: selectedReturnType == 'refund' ? _bankController.text : null,
+              photoPath: _photo?.path,
+              videoPath: _video?.path,
+            );
+
+            if (context.mounted) Navigator.pop(context); // Close loading
+
+            if (success) {
+              if (context.mounted) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Berhasil'),
+                    content: const Text('Pengajuan retur Anda telah terkirim.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.pop(context);
+                        },
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            } else {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(provider.errorMessage ?? 'Gagal mengajukan retur')),
+                );
+              }
+            }
           },
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 18),
-            decoration: BoxDecoration(
-              color: primaryColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            decoration: BoxDecoration(color: primaryColor, borderRadius: BorderRadius.circular(12)),
             child: Text(
               'Kirim Pengajuan Retur',
               textAlign: TextAlign.center,
-              style: GoogleFonts.epilogue(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
+              style: GoogleFonts.epilogue(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
         ),

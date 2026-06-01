@@ -7,8 +7,21 @@ import '../../core/theme/app_colors.dart';
 import '../../widgets/bounce_tap.dart';
 import 'address_form_page.dart';
 
-class AddressManagementPage extends StatelessWidget {
+class AddressManagementPage extends StatefulWidget {
   const AddressManagementPage({super.key});
+
+  @override
+  State<AddressManagementPage> createState() => _AddressManagementPageState();
+}
+
+class _AddressManagementPageState extends State<AddressManagementPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AddressProvider>().loadAddresses();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

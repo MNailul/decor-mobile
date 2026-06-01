@@ -8,6 +8,8 @@ import '../../models/product_model.dart';
 import '../product/product_detail_page.dart';
 import '../../widgets/bounce_tap.dart';
 import '../../widgets/custom_footer.dart';
+import '../../core/utils/currency_formatter.dart';
+
 
 class WishlistPage extends StatelessWidget {
   const WishlistPage({super.key});
@@ -191,11 +193,30 @@ class WishlistPage extends StatelessWidget {
                       context.read<CartProvider>().addToCart(product);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('${product.name} added to cart'),
+                          content: Row(
+                            children: [
+                              const Icon(Icons.check_circle_outline, color: Colors.white, size: 24),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('Added to Cart', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white)),
+                                    const SizedBox(height: 2),
+                                    Text(product.name, style: const TextStyle(fontSize: 11, color: Colors.white70)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                           behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           backgroundColor: AppColors.primaryColor,
-                          duration: const Duration(seconds: 1),
+                          elevation: 8,
+                          duration: const Duration(seconds: 2),
                         ),
                       );
                     },
@@ -235,7 +256,7 @@ class WishlistPage extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '\$${product.price.toStringAsFixed(2)}',
+            product.price.toIDR(),
             style: const TextStyle(
               color: AppColors.primaryColor,
               fontWeight: FontWeight.bold,

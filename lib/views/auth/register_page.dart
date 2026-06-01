@@ -12,32 +12,61 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final _usernameController = TextEditingController();
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
 
   @override
   void dispose() {
+    _usernameController.dispose();
     _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
   void _handleRegister() async {
+    final username = _usernameController.text.trim();
     final fullName = _fullNameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
 
-    if (fullName.isEmpty || email.isEmpty || password.isEmpty) {
+    if (username.isEmpty || fullName.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all fields')),
       );
       return;
     }
 
+    if (password != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match')),
+      );
+      return;
+    }
+
+    if (password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 8 characters')),
+      );
+      return;
+    }
+
     final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.register(fullName, email, password, '+49 172 884 9201');
+    final success = await authProvider.register(
+      username: username,
+      fullName: fullName,
+      email: email,
+      password: password,
+      confirmPassword: confirmPassword,
+    );
     
     if (success && mounted) {
       Navigator.pushAndRemoveUntil(
@@ -116,32 +145,66 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
               const SizedBox(height: 24),
+              // Username Field
+              TextFormField(
+                controller: _usernameController,
+                decoration: _inputDecoration('USERNAME'),
+              ),
+              const SizedBox(height: 16),
               // Full Name Field
               TextFormField(
                 controller: _fullNameController,
                 textCapitalization: TextCapitalization.words,
-                decoration: _inputDecoration('Full Name'),
+                decoration: _inputDecoration('FULL NAME'),
               ),
               const SizedBox(height: 16),
               // Email Field
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: _inputDecoration('Email Address'),
+                decoration: _inputDecoration('EMAIL ADDRESS'),
               ),
               const SizedBox(height: 16),
               // Password Field
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: _inputDecoration(
-                  'Password',
+                  'PASSWORD',
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.visibility_off_outlined, color: Colors.black45),
-                    onPressed: () {},
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, 
+                      color: Colors.black45
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              // Confirm Password Field
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirmPassword,
+                decoration: _inputDecoration(
+                  'CONFIRM PASSWORD',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, 
+                      color: Colors.black45
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscureConfirmPassword = !_obscureConfirmPassword;
+                      });
+                    },
+                  ),
+                ),
+              ),
+
               const SizedBox(height: 32),
               // Primary Button
               SizedBox(

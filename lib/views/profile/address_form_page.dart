@@ -5,6 +5,7 @@ import '../../providers/address_provider.dart';
 import '../../models/address_model.dart';
 import '../../core/theme/app_colors.dart';
 import '../../widgets/bounce_tap.dart';
+import '../../providers/auth_provider.dart';
 
 class AddressFormPage extends StatefulWidget {
   final AddressModel? addressToEdit;
@@ -22,6 +23,7 @@ class _AddressFormPageState extends State<AddressFormPage> {
   late TextEditingController _recipientNameController;
   late TextEditingController _phoneNumberController;
   late TextEditingController _fullAddressController;
+  late TextEditingController _cityController;
   bool _isMain = false;
 
   @override
@@ -31,6 +33,7 @@ class _AddressFormPageState extends State<AddressFormPage> {
     _recipientNameController = TextEditingController(text: widget.addressToEdit?.recipientName ?? '');
     _phoneNumberController = TextEditingController(text: widget.addressToEdit?.phoneNumber ?? '');
     _fullAddressController = TextEditingController(text: widget.addressToEdit?.fullAddress ?? '');
+    _cityController = TextEditingController(text: widget.addressToEdit?.city ?? '');
     _isMain = widget.addressToEdit?.isMain ?? false;
   }
 
@@ -40,11 +43,16 @@ class _AddressFormPageState extends State<AddressFormPage> {
     _recipientNameController.dispose();
     _phoneNumberController.dispose();
     _fullAddressController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
-  void _saveAddress() {
+  Future<void> _saveAddress() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        // You might want to add an isLoading state here
+      });
+
       final provider = context.read<AddressProvider>();
       
       final newAddress = AddressModel(
@@ -53,16 +61,31 @@ class _AddressFormPageState extends State<AddressFormPage> {
         recipientName: _recipientNameController.text,
         phoneNumber: _phoneNumberController.text,
         fullAddress: _fullAddressController.text,
+        city: _cityController.text,
         isMain: _isMain,
       );
 
+      bool success;
       if (widget.addressToEdit == null) {
-        provider.addAddress(newAddress);
+        success = await provider.addAddress(newAddress);
       } else {
-        provider.updateAddress(newAddress);
+        success = await provider.updateAddress(newAddress);
       }
 
-      Navigator.pop(context);
+      if (success) {
+        // Sync with backend if set as main
+        if (_isMain) {
+          await context.read<AuthProvider>().updateProfile(
+            address: _fullAddressController.text.trim(),
+            city: _cityController.text.trim(),
+          );
+        }
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to save address. Please try again.')),
+        );
+      }
     }
   }
 
@@ -121,8 +144,14 @@ class _AddressFormPageState extends State<AddressFormPage> {
               const SizedBox(height: 32),
               _buildSectionHeader('LOCATION DETAILS'),
               _buildTextField(
+                controller: _cityController,
+                hint: 'City / Region',
+                validator: (value) => value!.isEmpty ? 'Please enter city' : null,
+              ),
+              const SizedBox(height: 16),
+              _buildTextField(
                 controller: _fullAddressController,
-                hint: 'Street Name, House No, City, etc.',
+                hint: 'Full Address (Street Name, House No, etc.)',
                 maxLines: 4,
                 validator: (value) => value!.isEmpty ? 'Please enter full address' : null,
               ),

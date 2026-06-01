@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../models/order_model.dart';
+import '../../providers/order_provider.dart';
 
 class WriteReviewPage extends StatefulWidget {
   final OrderModel order;
@@ -80,7 +82,7 @@ class _WriteReviewPageState extends State<WriteReviewPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       image: DecorationImage(
-                        image: NetworkImage(item.product.imagePath),
+                        image: NetworkImage(item.product?.imageUrl ?? 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=200&q=80'),
                         fit: BoxFit.cover,
                       ),
                     ),
@@ -91,7 +93,7 @@ class _WriteReviewPageState extends State<WriteReviewPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          item.product.name,
+                          item.product?.name ?? 'Unknown Product',
                           style: GoogleFonts.epilogue(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -99,7 +101,7 @@ class _WriteReviewPageState extends State<WriteReviewPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${item.product.material} / ${item.product.style}',
+                          'Style: ${item.product?.style ?? "Modern"}',
                           style: GoogleFonts.epilogue(
                             fontSize: 13,
                             color: Colors.grey.shade600,
@@ -187,21 +189,54 @@ class _WriteReviewPageState extends State<WriteReviewPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   if (_rating == 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Please select a star rating.')),
                     );
                     return;
                   }
-                  // Submit review logic here
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Review submitted successfully!'),
-                      backgroundColor: AppColors.primaryColor,
-                    ),
+                  
+                  // Show loading
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primaryColor)),
                   );
-                  Navigator.pop(context);
+
+                  // Submit review logic for all products in the order
+                  bool hasError = false;
+                  final orderProvider = context.read<OrderProvider>();
+                  for (var item in widget.order.items) {
+                    if (item.product != null) {
+                      bool success = await orderProvider.submitReview(
+                        item.product!.id, 
+                        _rating, 
+                        _reviewController.text,
+                        orderId: widget.order.id,
+                      );
+                      if (!success) hasError = true;
+                    }
+                  }
+
+                  if (mounted) Navigator.pop(context); // close loading
+
+                  if (!hasError && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Review submitted successfully!'),
+                        backgroundColor: AppColors.primaryColor,
+                      ),
+                    );
+                    Navigator.pop(context);
+                  } else if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to submit some reviews. Please try again.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryColor,

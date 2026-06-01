@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/order_model.dart';
 import 'package:intl/intl.dart';
+import '../../core/utils/currency_formatter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../core/constants.dart';
+
 
 class InvoicePage extends StatelessWidget {
   final OrderModel order;
@@ -15,9 +19,7 @@ class InvoicePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dateStr = DateFormat('MMM dd, yyyy').format(order.orderDate);
-    final subtotal = order.items.fold(0.0, (sum, item) => sum + (item.product.price * item.quantity));
-    const shipping = 15.0;
-    const taxes = 24.40;
+    final subtotal = order.items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
@@ -55,7 +57,7 @@ class InvoicePage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -88,7 +90,7 @@ class InvoicePage extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Receipt for Order ${order.id}',
+                          'Receipt for Order #${order.id}',
                           style: GoogleFonts.epilogue(
                             color: lightTextColor,
                             fontSize: 14,
@@ -109,11 +111,11 @@ class InvoicePage extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             _buildInfoColumn('ORDER DATE', dateStr),
-                            _buildInfoColumn('STATUS', order.status.name.toUpperCase()),
+                            _buildInfoColumn('STATUS', _getStatusText(order.status)),
                           ],
                         ),
                         const SizedBox(height: 32),
-                        _buildInfoColumn('BILL TO', 'John Doe\n123 Luxury Avenue, Suite 405\nBeverly Hills, CA 90210'),
+                        _buildInfoColumn('BILL TO', '${order.shippingRecipient}\n${order.shippingAddress}, ${order.shippingCity}\n${order.shippingPhone}'),
                         const SizedBox(height: 40),
                         
                         // Itemized List
@@ -134,12 +136,12 @@ class InvoicePage extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: Text(
-                                  '${item.quantity} x ${item.product.name}',
+                                  '${item.quantity} x ${item.product?.name ?? "Unknown"}',
                                   style: GoogleFonts.epilogue(fontSize: 14, fontWeight: FontWeight.w500),
                                 ),
                               ),
                               Text(
-                                '\$${(item.product.price * item.quantity).toStringAsFixed(2)}',
+                                (item.price * item.quantity).toIDR(),
                                 style: GoogleFonts.epilogue(fontSize: 14, fontWeight: FontWeight.bold),
                               ),
                             ],
@@ -150,11 +152,11 @@ class InvoicePage extends StatelessWidget {
                         const SizedBox(height: 24),
 
                         // Totals section
-                        _buildTotalRow('Subtotal', '\$${subtotal.toStringAsFixed(2)}'),
+                        _buildTotalRow('Subtotal', subtotal.toIDR()),
                         const SizedBox(height: 12),
-                        _buildTotalRow('Shipping', '\$${shipping.toStringAsFixed(2)}'),
-                        const SizedBox(height: 12),
-                        _buildTotalRow('Taxes', '\$${taxes.toStringAsFixed(2)}'),
+                        if (order.totalAmount > subtotal)
+                          _buildTotalRow('Shipping & Others', (order.totalAmount - subtotal).toIDR()),
+
                         const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -164,7 +166,7 @@ class InvoicePage extends StatelessWidget {
                               style: GoogleFonts.epilogue(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
                             Text(
-                              '\$${order.totalAmount.toStringAsFixed(2)}',
+                              order.totalAmount.toIDR(),
                               style: GoogleFonts.epilogue(
                                 fontSize: 20, 
                                 fontWeight: FontWeight.w900,
@@ -206,7 +208,18 @@ class InvoicePage extends StatelessWidget {
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () async {
+                  final url = Uri.parse('${ApiConstants.baseUrl}/invoice/${order.id}/download?ngrok-skip-browser-warning=1');
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  } else {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Could not launch download URL')),
+                      );
+                    }
+                  }
+                },
                 icon: const Icon(Icons.download, size: 20),
                 label: const Text('DOWNLOAD INVOICE'),
                 style: ElevatedButton.styleFrom(
@@ -222,6 +235,23 @@ class InvoicePage extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _getStatusText(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.processing:
+        return 'DALAM PROSES';
+      case OrderStatus.shipped:
+        return 'DIKIRIM';
+      case OrderStatus.delivered:
+        return 'SELESAI';
+      case OrderStatus.cancelled:
+        return 'DIBATALKAN';
+      case OrderStatus.returning:
+        return 'DIKEMBALIKAN';
+      default:
+        return 'PENDING';
+    }
   }
 
   Widget _buildInfoColumn(String label, String value) {

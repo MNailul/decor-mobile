@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
@@ -34,14 +35,30 @@ class _EditProfilePageState extends State<EditProfilePage> {
     super.dispose();
   }
 
-  void _changeProfilePicture() {
-    // Mock changing profile picture
-    setState(() {
-      _profilePictureUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80';
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile picture updated successfully!')),
+  Future<void> _changeProfilePicture() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
     );
+
+    if (image != null && mounted) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final success = await authProvider.uploadProfilePicture(image.path);
+
+      if (success && mounted) {
+        setState(() {
+          _profilePictureUrl = authProvider.currentUser?.profilePicture;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile picture updated successfully!')),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload image. Please try again.')),
+        );
+      }
+    }
   }
 
   void _saveProfile() {
@@ -101,10 +118,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       shape: BoxShape.circle,
                       border: Border.all(color: secondaryColor, width: 2),
                     ),
-                    child: CircleAvatar(
-                      radius: 54,
-                      backgroundColor: secondaryColor,
-                      backgroundImage: NetworkImage(_profilePictureUrl ?? 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&q=80'),
+                    child: Consumer<AuthProvider>(
+                      builder: (context, authProvider, child) {
+                        return CircleAvatar(
+                          radius: 54,
+                          backgroundColor: secondaryColor,
+                          backgroundImage: (authProvider.currentUser?.profilePicture != null && authProvider.currentUser!.profilePicture!.isNotEmpty)
+                              ? NetworkImage(authProvider.currentUser!.profilePicture!)
+                              : const NetworkImage('https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&q=80'),
+                          child: authProvider.isLoading 
+                              ? Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black26,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Center(
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                                  ),
+                                )
+                              : null,
+                        );
+                      },
                     ),
                   ),
                   Container(

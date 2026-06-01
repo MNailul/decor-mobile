@@ -1,18 +1,60 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/designer_provider.dart';
+import '../../models/designer_model.dart';
 import '../auth/login_page.dart';
 import 'designer_booking_page.dart';
+import 'free_chat_page.dart';
+import 'portfolio_detail_page.dart';
 
-class DesignerProfilePage extends StatelessWidget {
-  final Map<String, dynamic> designer;
+class DesignerProfilePage extends StatefulWidget {
+  final DesignerModel designer;
 
   const DesignerProfilePage({super.key, required this.designer});
 
+  @override
+  State<DesignerProfilePage> createState() => _DesignerProfilePageState();
+}
+
+class _DesignerProfilePageState extends State<DesignerProfilePage> {
+  late DesignerModel currentDesigner;
+  bool _isRefreshing = false;
+
   static const Color primaryColor = Color(0xFFB5733A);
-  static const Color secondaryColor = Color(0xFFE3DCD6);
   static const Color textColor = Color(0xFF1E1E1E);
+
+  @override
+  void initState() {
+    super.initState();
+    currentDesigner = widget.designer;
+    _refreshDesignerData();
+  }
+
+  Future<void> _refreshDesignerData() async {
+    setState(() => _isRefreshing = true);
+    try {
+      final updatedDesigner = await context.read<DesignerProvider>().getDesignerDetail(widget.designer.id);
+      if (updatedDesigner != null && mounted) {
+        setState(() {
+          currentDesigner = updatedDesigner;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  Future<void> _launchURL(String? urlString) async {
+    if (urlString == null || urlString.isEmpty) return;
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      throw Exception('Could not launch $urlString');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,291 +68,209 @@ class DesignerProfilePage extends StatelessWidget {
           icon: const Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh, color: _isRefreshing ? Colors.grey : textColor, size: 20),
+            onPressed: _isRefreshing ? null : _refreshDesignerData,
+          ),
+          if (currentDesigner.instagramUrl != null && currentDesigner.instagramUrl!.isNotEmpty)
+            IconButton(
+              icon: const FaIcon(FontAwesomeIcons.instagram, color: textColor, size: 20),
+              onPressed: () => _launchURL(currentDesigner.instagramUrl),
+            ),
+          if (currentDesigner.linkedinUrl != null && currentDesigner.linkedinUrl!.isNotEmpty)
+            IconButton(
+              icon: const FaIcon(FontAwesomeIcons.linkedin, color: textColor, size: 20),
+              onPressed: () => _launchURL(currentDesigner.linkedinUrl),
+            ),
+          const SizedBox(width: 8),
+        ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Profile Header
-            Center(
-              child: Column(
+      body: RefreshIndicator(
+        onRefresh: _refreshDesignerData,
+        color: primaryColor,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Cover Banner and Profile Image Stack
+              Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundImage: NetworkImage(designer['image']),
-                        backgroundColor: secondaryColor,
-                      ),
-                      if (designer['isOnline'] == true)
-                        Positioned(
-                          bottom: 4,
-                          right: 8,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade500,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        designer['name'],
-                        style: GoogleFonts.epilogue(
-                          color: textColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
-                        ),
-                      ),
-                      if (designer['isVerified'] == true) ...[
-                        const SizedBox(width: 8),
-                        const Icon(Icons.verified, color: Colors.blue, size: 24),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    designer['specialty'],
-                    style: GoogleFonts.epilogue(
-                      color: primaryColor,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            const SizedBox(height: 32),
-            
-            // Stats Row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildStatItem('Rating', designer['rating'], Icons.star_rounded, primaryColor),
-                  Container(width: 1, height: 40, color: Colors.grey.shade300),
-                  _buildStatItem('Projects', designer['projects']?.toString() ?? '50+', Icons.task_alt, primaryColor),
-                  Container(width: 1, height: 40, color: Colors.grey.shade300),
-                  _buildStatItem('Starting at', designer['price'].replaceAll('Mulai ', ''), Icons.payments_outlined, textColor),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-            
-            // About Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'About Designer',
-                    style: GoogleFonts.epilogue(
-                      color: textColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    designer['bio'],
-                    style: GoogleFonts.epilogue(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
-                      height: 1.6,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Portfolio Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Text(
-                'Portfolio',
-                style: GoogleFonts.epilogue(
-                  color: textColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                scrollDirection: Axis.horizontal,
-                itemCount: (designer['portfolio'] as List<String>).length,
-                itemBuilder: (context, index) {
-                  final url = (designer['portfolio'] as List<String>)[index];
-                  return Container(
-                    width: 160,
-                    margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                  Container(
+                    width: double.infinity,
+                    height: 160,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.grey.shade100,
                       image: DecorationImage(
-                        image: NetworkImage(url),
+                        image: NetworkImage(currentDesigner.banner ?? 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=1200'),
                         fit: BoxFit.cover,
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Customer Reviews Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Customer Reviews',
-                    style: GoogleFonts.epilogue(
-                      color: textColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
                   ),
-                  TextButton(
-                    onPressed: () {},
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: const Size(50, 30),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      'See All',
-                      style: GoogleFonts.epilogue(
-                        color: primaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                  Positioned(
+                    bottom: -50,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 54,
+                            backgroundImage: NetworkImage(currentDesigner.image),
+                            backgroundColor: Colors.white,
+                          ),
+                          if (currentDesigner.isOpen)
+                            Positioned(
+                              bottom: 2,
+                              right: 4,
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade500,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2.5),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: designer['reviews'] != null ? (designer['reviews'] as List).length : 2,
-              itemBuilder: (context, index) {
-                final List<Map<String, String>> dummyReviews = [
-                  {
-                    'name': 'Sarah Jenkins',
-                    'rating': '5.0',
-                    'date': '2 days ago',
-                    'comment': 'Absolutely loved working with them! They really understood my vision and brought it to life.',
-                    'image': 'https://i.pravatar.cc/150?img=1',
-                  },
-                  {
-                    'name': 'Michael Chen',
-                    'rating': '4.8',
-                    'date': '1 week ago',
-                    'comment': 'Very professional and great attention to detail. Highly recommend for any home project.',
-                    'image': 'https://i.pravatar.cc/150?img=11',
-                  },
-                ];
-                
-                final reviewsList = designer['reviews'] != null 
-                    ? designer['reviews'] as List<Map<String, String>> 
-                    : dummyReviews;
-                    
-                final review = reviewsList[index];
-                
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+              const SizedBox(height: 66),
+
+              // Profile Name, Specialty and Open Status Details
+              Center(
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          currentDesigner.studioName,
+                          style: GoogleFonts.epilogue(
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.verified, color: Colors.blue, size: 24),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      currentDesigner.specialty,
+                      style: GoogleFonts.epilogue(
+                        color: primaryColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
                       ),
-                    ],
-                    border: Border.all(color: Colors.grey.shade100),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: currentDesigner.isOpen ? Colors.green.shade50 : Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: currentDesigner.isOpen ? Colors.green.shade200 : Colors.red.shade200,
+                          width: 0.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          CircleAvatar(
-                            radius: 20,
-                            backgroundImage: NetworkImage(review['image']!),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  review['name']!,
-                                  style: GoogleFonts.epilogue(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                    color: textColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  review['date']!,
-                                  style: GoogleFonts.epilogue(
-                                    fontSize: 12,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            width: 6,
+                            height: 6,
                             decoration: BoxDecoration(
-                              color: Colors.amber.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
+                              color: currentDesigner.isOpen ? Colors.green.shade500 : Colors.red.shade500,
+                              shape: BoxShape.circle,
                             ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                                const SizedBox(width: 4),
-                                Text(
-                                  review['rating']!,
-                                  style: GoogleFonts.epilogue(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                    color: Colors.amber.shade700,
-                                  ),
-                                ),
-                              ],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            currentDesigner.isOpen ? 'OPEN FOR PROJECTS' : 'CLOSED FOR PROJECTS',
+                            style: GoogleFonts.epilogue(
+                              color: currentDesigner.isOpen ? Colors.green.shade700 : Colors.red.shade700,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.0,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+              
+              // Stats Row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildStatItem('Rating', currentDesigner.rating.toStringAsFixed(1), Icons.star_rounded, primaryColor),
+                    Container(width: 1, height: 40, color: Colors.grey.shade300),
+                    _buildStatItem('Projects', '${currentDesigner.projectsCompleted}', Icons.task_alt, primaryColor),
+                    Container(width: 1, height: 40, color: Colors.grey.shade300),
+                    _buildStatItem('Avg. Duration', currentDesigner.averageProjectDuration ?? '-', Icons.timer_outlined, primaryColor),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+              
+              // About Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'About Designer',
+                      style: GoogleFonts.epilogue(
+                        color: textColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      currentDesigner.bio ?? 'No bio provided.',
+                      style: GoogleFonts.epilogue(
+                        color: Colors.grey.shade600,
+                        fontSize: 14,
+                        height: 1.6,
+                      ),
+                    ),
+                    if (currentDesigner.education != null && currentDesigner.education!.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          const Icon(Icons.school_outlined, color: primaryColor, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Education',
+                            style: GoogleFonts.epilogue(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       Text(
-                        review['comment']!,
+                        currentDesigner.education!,
                         style: GoogleFonts.epilogue(
                           color: Colors.grey.shade600,
                           fontSize: 13,
@@ -318,13 +278,206 @@ class DesignerProfilePage extends StatelessWidget {
                         ),
                       ),
                     ],
+                    if (currentDesigner.awards != null && currentDesigner.awards!.isNotEmpty) ...[
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          const Icon(Icons.emoji_events_outlined, color: primaryColor, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Awards & Achievements',
+                            style: GoogleFonts.epilogue(
+                              color: textColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        currentDesigner.awards!,
+                        style: GoogleFonts.epilogue(
+                          color: Colors.grey.shade600,
+                          fontSize: 13,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Portfolio Section
+              if (currentDesigner.portfolios != null && currentDesigner.portfolios!.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Portfolio',
+                        style: GoogleFonts.epilogue(
+                          color: textColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      if ((currentDesigner.instagramUrl != null && currentDesigner.instagramUrl!.isNotEmpty) ||
+                          (currentDesigner.linkedinUrl != null && currentDesigner.linkedinUrl!.isNotEmpty))
+                        Row(
+                          children: [
+                            const Icon(Icons.info_outline, size: 12, color: primaryColor),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Lihat sosmed untuk karya lengkap',
+                              style: GoogleFonts.epilogue(
+                                color: primaryColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
                   ),
-                );
-              },
-            ),
-            
-            const SizedBox(height: 120), // Bottom padding
-          ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 240,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: currentDesigner.portfolios!.length,
+                    itemBuilder: (context, index) {
+                      final portfolio = currentDesigner.portfolios![index];
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PortfolioDetailPage(portfolio: portfolio),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 200,
+                          margin: const EdgeInsets.symmetric(horizontal: 8.0),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            image: DecorationImage(
+                              image: NetworkImage(portfolio.imageUrl),
+                              fit: BoxFit.cover,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withOpacity(0.7),
+                                ],
+                              ),
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    if (portfolio.category != null)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          portfolio.category!.toUpperCase(),
+                                          style: GoogleFonts.epilogue(
+                                            color: Colors.white,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1,
+                                          ),
+                                        ),
+                                      )
+                                    else
+                                      const SizedBox.shrink(),
+                                    if (portfolio.is360)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: primaryColor,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.panorama_photosphere_outlined, color: Colors.white, size: 8),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              '360°',
+                                              style: GoogleFonts.epilogue(
+                                                color: Colors.white,
+                                                fontSize: 8,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  portfolio.title ?? 'Untitled Project',
+                                  style: GoogleFonts.epilogue(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 32),
+              ] else if (!_isRefreshing) ...[
+                 Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Center(
+                    child: Text(
+                      'No portfolio items found.',
+                      style: GoogleFonts.epilogue(color: Colors.grey, fontSize: 12),
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 120), // Bottom padding
+            ],
+          ),
         ),
       ),
       bottomSheet: Container(
@@ -339,55 +492,125 @@ class DesignerProfilePage extends StatelessWidget {
             ),
           ],
         ),
-        child: SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: ElevatedButton(
-            onPressed: () {
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
-              
-              if (authProvider.isLoggedIn) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DesignerBookingPage(designer: designer),
-                  ),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Please login to book a consultation'),
-                    behavior: SnackBarBehavior.floating,
-                    action: SnackBarAction(
-                      label: 'LOGIN',
-                      onPressed: () {
+        child: Builder(
+          builder: (context) {
+            bool hasUsedFreeChat = false;
+            bool isActiveFreeChat = false;
+            int timeLeft = 0;
+
+            if (currentDesigner.freeConsultation != null) {
+              final fc = currentDesigner.freeConsultation!;
+              hasUsedFreeChat = fc['is_completed'] == true || !(fc['is_active'] ?? false);
+              isActiveFreeChat = fc['is_active'] == true;
+              timeLeft = fc['time_left'] ?? 0;
+            }
+
+            String buttonText = 'Book Consultation';
+            if (isActiveFreeChat) {
+              buttonText = 'Continue Free Chat (${timeLeft ~/ 60}m left)';
+            } else if (!hasUsedFreeChat) {
+              buttonText = 'Start 10 Min Free Chat';
+            }
+
+            return SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: () async {
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  
+                  if (!authProvider.isLoggedIn) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Please login to book a consultation'),
+                        behavior: SnackBarBehavior.floating,
+                        action: SnackBarAction(
+                          label: 'LOGIN',
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const LoginPage()),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (isActiveFreeChat) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FreeChatPage(
+                          designer: currentDesigner,
+                          initialTimeLeft: timeLeft,
+                        ),
+                      ),
+                    ).then((_) => _refreshDesignerData());
+                  } else if (!hasUsedFreeChat) {
+                    // Start free chat API call
+                    final result = await context.read<DesignerProvider>().startFreeChat(currentDesigner.id);
+                    if (result != null && mounted) {
+                      final fc = result['free_consultation'];
+                      int newTimeLeft = result['time_left'] ?? 600;
+                      if (fc != null && fc['is_completed'] == true) {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => const LoginPage()),
+                          MaterialPageRoute(
+                            builder: (context) => DesignerBookingPage(designer: currentDesigner),
+                          ),
                         );
-                      },
-                    ),
+                      } else {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FreeChatPage(
+                              designer: currentDesigner,
+                              initialTimeLeft: newTimeLeft,
+                            ),
+                          ),
+                        ).then((_) => _refreshDesignerData());
+                      }
+                    } else if (mounted) {
+                       ScaffoldMessenger.of(context).showSnackBar(
+                         const SnackBar(content: Text('Failed to start free consultation')),
+                       );
+                    }
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DesignerBookingPage(designer: currentDesigner),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: !hasUsedFreeChat ? Colors.green.shade600 : primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                ),
+                child: context.watch<DesignerProvider>().isLoading && (!hasUsedFreeChat || isActiveFreeChat)
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                    : Text(
+                        buttonText,
+                        style: GoogleFonts.epilogue(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
               ),
-            ),
-            child: Text(
-              'Book Consultation',
-              style: GoogleFonts.epilogue(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
+            );
+          }
         ),
       ),
     );

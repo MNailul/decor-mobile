@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/cart_provider.dart';
 import '../home/home_page.dart';
 import 'register_page.dart';
 import 'forgot_password_page.dart';
@@ -16,6 +17,8 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
 
   @override
   void dispose() {
@@ -39,6 +42,9 @@ class _LoginPageState extends State<LoginPage> {
     final success = await authProvider.login(email, password);
     
     if (success && mounted) {
+      // Sync cart after login
+      context.read<CartProvider>().fetchCart();
+      
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (context) => const HomePage()),
@@ -118,15 +124,23 @@ class _LoginPageState extends State<LoginPage> {
               // Password Field
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
+                obscureText: _obscurePassword,
                 decoration: _inputDecoration(
                   'Password',
                   suffixIcon: IconButton(
-                    icon: const Icon(Icons.visibility_off_outlined, color: Colors.black45),
-                    onPressed: () {}, // Optional: Add obscure toggle functionality if desired
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, 
+                      color: Colors.black45
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
                   ),
                 ),
               ),
+
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
